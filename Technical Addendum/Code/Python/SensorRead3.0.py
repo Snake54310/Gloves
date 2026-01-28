@@ -9,7 +9,7 @@ import sys
 from PySideGraphicalDisplay import GloveMonitorWindow
 
 #Serial port constants and variables
-port = 'COM4'
+port = 'COM8'
 baudRate = 2000000
 dataLine = [0]
 dataThread = None
@@ -62,7 +62,7 @@ def start_data_acquire():
 
 #Read data sent from gloves over serial, and output to desired file
 def data_acquire(port, baudRate, outputFileName):
-    global enable, reader, csvFile, csvWriter, startTime
+    global enable, reader, csvFile, csvWriter, startTime, liveGUIWindow
     # Try to open serial port
     try:
         set_status("Connecting to glove...")
@@ -103,7 +103,8 @@ def data_acquire(port, baudRate, outputFileName):
                 dataLine.insert(0, timestamp)
                 csvWriter.writerow(dataLine)
 
-                liveDisplayUpdate() # send data to liveDisplay for conversion to Interface Output
+                if liveGUIWindow:
+                    liveDisplayUpdate(liveGUIWindow, data, timestamp) # send data to liveDisplay for conversion to Interface Output
 
     except serial.SerialException as e:
         tk.messagebox.showerror("Error", f"Error: Could not open serial port\n{e}")
@@ -135,7 +136,14 @@ def stop_data():
 
 #Close serial reader, csv file, and data thread
 def free_resources():
-    global  reader, csvFile, dataThread
+    global  reader, csvFile, dataThread, liveGUIWindow
+
+    # close pyside window if it exists
+    if liveGUIWindow is not None:
+        liveGUIWindow.close()
+        liveGUIWindow.deleteLater()
+        liveGUIWindow = None
+
     #Close serial reader
     if reader:
         try:
@@ -151,8 +159,7 @@ def free_resources():
         except Exception as e:
             print("Error closing CSV file: {e}")
 
-    global liveGUIWindow
-    liveGUIWindow = None
+        return
 
     #Join data thread with main thread
     if dataThread:
@@ -236,16 +243,25 @@ def finishCalibration():
     set_status("Ready to collect data")
 
 def liveDisplayOpen():
-    newWindow = GloveMonitorWindow()
-    newWindow.initDisplay()
-    return newWindow
+    # create global variable to ensure we do not create new PySide session at existing address
+    global liveGUIWindow
+    liveGUIWindow = GloveMonitorWindow()
+    liveGUIWindow.initDisplay()
+    return liveGUIWindow
 
-def liveDisplayUpdate():
-    pass
+def liveDisplayUpdate(currentWindow, data, timestamp):
+    currentWindow.updateData(data, timestamp)
+    return
 
 def liveDisplayClose(OldWindow):
+
+    global liveGUIWindow
     if OldWindow is not None:
+        # turn off display (and delete instance of PySide)
         OldWindow.terminateDisplay()
+        OldWindow.deleteLater()
+    # clear global PySide Object
+    liveGUIWindow = None
     return
 
 if __name__ == "__main__":
