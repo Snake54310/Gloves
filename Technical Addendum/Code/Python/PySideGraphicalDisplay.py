@@ -3,6 +3,7 @@ from PySide6.QtCore import Qt
 from scipy import signal
 from collections import deque
 import time
+import math
 
 app = QApplication.instance()
 if app is None:
@@ -10,9 +11,24 @@ if app is None:
 
 
 class LowPassFilter:
-    def __init__(self, cutoff_freq=5, sample_rate=27.4, order=2):
+    def __init__(self, cutoff_freq=5, sample_rate=100, order=2):
+        # Ensure sample rate is reasonable
+        if sample_rate < 1:
+            sample_rate = 100  # Default fallback
+
         nyquist = sample_rate / 2
+
+        # Ensure cutoff is less than Nyquist frequency
+        # Rule: cutoff must be < sample_rate / 2
+        if cutoff_freq >= nyquist:
+            cutoff_freq = nyquist * 0.9  # Use 90% of Nyquist
+
         normal_cutoff = cutoff_freq / nyquist
+
+        # Safety check: must be between 0 and 1
+        if normal_cutoff <= 0 or normal_cutoff >= 1:
+            normal_cutoff = 0.1  # Conservative default
+
         self.b, self.a = signal.butter(order, normal_cutoff, btype='low')
         self.zi = signal.lfilter_zi(self.b, self.a)
 
@@ -109,6 +125,9 @@ class GloveMonitorWindow(QMainWindow):
         self.dataLabel7 = QLabel('Acc Z: --')
         self.dataLabel7.setAlignment(Qt.AlignCenter)
 
+        self.dataLabel8 = QLabel('Flex Angle (deg): --')
+        self.dataLabel8.setAlignment(Qt.AlignCenter)
+
         # Initial layout
         self.setupLayout()
 
@@ -164,22 +183,26 @@ class GloveMonitorWindow(QMainWindow):
         if self.currentView == 'Wrist':
             # Wrist has no flex sensor, so different layout
             self.dataLabel1.hide()  # Hide flex label
+            self.dataLabel8.hide()
             self.layout.addWidget(self.dataLabel2, 3, 0)
             self.layout.addWidget(self.dataLabel3, 3, 1)
             self.layout.addWidget(self.dataLabel4, 3, 2)
             self.layout.addWidget(self.dataLabel5, 4, 0)
             self.layout.addWidget(self.dataLabel6, 4, 1)
             self.layout.addWidget(self.dataLabel7, 4, 2)
+
         else:
             # Finger views have flex sensor
             self.dataLabel1.show()
-            self.layout.addWidget(self.dataLabel1, 3, 1)
+            self.dataLabel8.show()
+            self.layout.addWidget(self.dataLabel1, 3, 0)
             self.layout.addWidget(self.dataLabel2, 4, 0)
             self.layout.addWidget(self.dataLabel3, 4, 1)
             self.layout.addWidget(self.dataLabel4, 4, 2)
             self.layout.addWidget(self.dataLabel5, 5, 0)
             self.layout.addWidget(self.dataLabel6, 5, 1)
             self.layout.addWidget(self.dataLabel7, 5, 2)
+            self.layout.addWidget(self.dataLabel8, 3, 1)
 
     def changeView(self, viewName):
         """Change which finger/wrist data is being displayed"""
@@ -291,57 +314,92 @@ class GloveMonitorWindow(QMainWindow):
         if len(dataArray) < 41:
             return
 
+        def format_value(value):
+            try:
+                return f'{float(value):.2f}'
+            except (ValueError, TypeError):
+                return '--'
+
+        def getFingerAngle(value):
+            try:
+                flex = float(value)
+                angle = 0.00001595*flex**3 - 0.003083*flex**2 + 0.4174*flex + 0.8620
+                return angle
+            except (ValueError, TypeError):
+                return '--'
+
+        def getThumbAngle(value):
+            try:
+                flex = float(value)
+                angle = 0.000005956*flex**3 - 0.001171*flex**2 + 0.2502*flex + 2.747
+                return angle # poor approximation for now, will need to do actual collection of thumb data
+            except (ValueError, TypeError):
+                return '--'
+
         # Update based on current view (using filtered data)
         if self.currentView == 'Thumb':
-            self.dataLabel1.setText(f'Flex: {dataArray[0]:.2f}')
-            self.dataLabel2.setText(f'Gyro X: {dataArray[8]:.2f}')
-            self.dataLabel3.setText(f'Gyro Y: {dataArray[9]:.2f}')
-            self.dataLabel4.setText(f'Gyro Z: {dataArray[10]:.2f}')
-            self.dataLabel5.setText(f'Acc X: {dataArray[5]:.2f}')
-            self.dataLabel6.setText(f'Acc Y: {dataArray[6]:.2f}')
-            self.dataLabel7.setText(f'Acc Z: {dataArray[7]:.2f}')
+            self.dataLabel1.setText(f'Flex: {format_value(dataArray[0])}')
+            self.dataLabel2.setText(f'Gyro X: {format_value(dataArray[8])}')
+            self.dataLabel3.setText(f'Gyro Y: {format_value(dataArray[9])}')
+            self.dataLabel4.setText(f'Gyro Z: {format_value(dataArray[10])}')
+            self.dataLabel5.setText(f'Acc X: {format_value(dataArray[5])}')
+            self.dataLabel6.setText(f'Acc Y: {format_value(dataArray[6])}')
+            self.dataLabel7.setText(f'Acc Z: {format_value(dataArray[7])}')
+            # Live Angle display:
+            self.dataLabel8.setText(f'Flex Angle (deg): {format_value(getThumbAngle(format_value(dataArray[0])))}')
 
         elif self.currentView == 'Pointer':
-            self.dataLabel1.setText(f'Flex: {dataArray[1]:.2f}')
-            self.dataLabel2.setText(f'Gyro X: {dataArray[14]:.2f}')
-            self.dataLabel3.setText(f'Gyro Y: {dataArray[15]:.2f}')
-            self.dataLabel4.setText(f'Gyro Z: {dataArray[16]:.2f}')
-            self.dataLabel5.setText(f'Acc X: {dataArray[11]:.2f}')
-            self.dataLabel6.setText(f'Acc Y: {dataArray[12]:.2f}')
-            self.dataLabel7.setText(f'Acc Z: {dataArray[13]:.2f}')
+            self.dataLabel1.setText(f'Flex: {format_value(dataArray[1])}')
+            self.dataLabel2.setText(f'Gyro X: {format_value(dataArray[14])}')
+            self.dataLabel3.setText(f'Gyro Y: {format_value(dataArray[15])}')
+            self.dataLabel4.setText(f'Gyro Z: {format_value(dataArray[16])}')
+            self.dataLabel5.setText(f'Acc X: {format_value(dataArray[11])}')
+            self.dataLabel6.setText(f'Acc Y: {format_value(dataArray[12])}')
+            self.dataLabel7.setText(f'Acc Z: {format_value(dataArray[13])}')
+            # Live Angle display:
+            self.dataLabel8.setText(f'Flex Angle (deg): {format_value(getFingerAngle(format_value(dataArray[1])))}')
+
 
         elif self.currentView == 'Middle':
-            self.dataLabel1.setText(f'Flex: {dataArray[2]:.2f}')
-            self.dataLabel2.setText(f'Gyro X: {dataArray[20]:.2f}')
-            self.dataLabel3.setText(f'Gyro Y: {dataArray[21]:.2f}')
-            self.dataLabel4.setText(f'Gyro Z: {dataArray[22]:.2f}')
-            self.dataLabel5.setText(f'Acc X: {dataArray[17]:.2f}')
-            self.dataLabel6.setText(f'Acc Y: {dataArray[18]:.2f}')
-            self.dataLabel7.setText(f'Acc Z: {dataArray[19]:.2f}')
+            self.dataLabel1.setText(f'Flex: {format_value(dataArray[2])}')
+            self.dataLabel2.setText(f'Gyro X: {format_value(dataArray[20])}')
+            self.dataLabel3.setText(f'Gyro Y: {format_value(dataArray[21])}')
+            self.dataLabel4.setText(f'Gyro Z: {format_value(dataArray[22])}')
+            self.dataLabel5.setText(f'Acc X: {format_value(dataArray[17])}')
+            self.dataLabel6.setText(f'Acc Y: {format_value(dataArray[18])}')
+            self.dataLabel7.setText(f'Acc Z: {format_value(dataArray[19])}')
+            # Live Angle display:
+            self.dataLabel8.setText(f'Flex Angle (deg): {format_value(getFingerAngle(format_value(dataArray[2])))}')
 
         elif self.currentView == 'Ring':
-            self.dataLabel1.setText(f'Flex: {dataArray[3]:.2f}')
-            self.dataLabel2.setText(f'Gyro X: {dataArray[26]:.2f}')
-            self.dataLabel3.setText(f'Gyro Y: {dataArray[27]:.2f}')
-            self.dataLabel4.setText(f'Gyro Z: {dataArray[28]:.2f}')
-            self.dataLabel5.setText(f'Acc X: {dataArray[23]:.2f}')
-            self.dataLabel6.setText(f'Acc Y: {dataArray[24]:.2f}')
-            self.dataLabel7.setText(f'Acc Z: {dataArray[25]:.2f}')
+            self.dataLabel1.setText(f'Flex: {format_value(dataArray[3])}')
+            self.dataLabel2.setText(f'Gyro X: {format_value(dataArray[26])}')
+            self.dataLabel3.setText(f'Gyro Y: {format_value(dataArray[27])}')
+            self.dataLabel4.setText(f'Gyro Z: {format_value(dataArray[28])}')
+            self.dataLabel5.setText(f'Acc X: {format_value(dataArray[23])}')
+            self.dataLabel6.setText(f'Acc Y: {format_value(dataArray[24])}')
+            self.dataLabel7.setText(f'Acc Z: {format_value(dataArray[25])}')
+            # Live Angle display:
+            self.dataLabel8.setText(f'Flex Angle (deg): {format_value(getFingerAngle(format_value(dataArray[3])))}')
 
         elif self.currentView == 'Pinky':
-            self.dataLabel1.setText(f'Flex: {dataArray[4]:.2f}')
-            self.dataLabel2.setText(f'Gyro X: {dataArray[32]:.2f}')
-            self.dataLabel3.setText(f'Gyro Y: {dataArray[33]:.2f}')
-            self.dataLabel4.setText(f'Gyro Z: {dataArray[34]:.2f}')
-            self.dataLabel5.setText(f'Acc X: {dataArray[29]:.2f}')
-            self.dataLabel6.setText(f'Acc Y: {dataArray[30]:.2f}')
-            self.dataLabel7.setText(f'Acc Z: {dataArray[31]:.2f}')
+            self.dataLabel1.setText(f'Flex: {format_value(dataArray[4])}')
+            self.dataLabel2.setText(f'Gyro X: {format_value(dataArray[32])}')
+            self.dataLabel3.setText(f'Gyro Y: {format_value(dataArray[33])}')
+            self.dataLabel4.setText(f'Gyro Z: {format_value(dataArray[34])}')
+            self.dataLabel5.setText(f'Acc X: {format_value(dataArray[29])}')
+            self.dataLabel6.setText(f'Acc Y: {format_value(dataArray[30])}')
+            self.dataLabel7.setText(f'Acc Z: {format_value(dataArray[31])}')
+            # Live Angle display:
+            self.dataLabel8.setText(f'Flex Angle (deg): {format_value(getFingerAngle(format_value(dataArray[4])))}')
 
         elif self.currentView == 'Wrist':
             # Wrist has no flex sensor
-            self.dataLabel2.setText(f'Gyro X: {dataArray[35]:.2f}')
-            self.dataLabel3.setText(f'Gyro Y: {dataArray[36]:.2f}')
-            self.dataLabel4.setText(f'Gyro Z: {dataArray[37]:.2f}')
-            self.dataLabel5.setText(f'Acc X: {dataArray[38]:.2f}')
-            self.dataLabel6.setText(f'Acc Y: {dataArray[39]:.2f}')
-            self.dataLabel7.setText(f'Acc Z: {dataArray[40]:.2f}')
+            self.dataLabel2.setText(f'Gyro X: {format_value(dataArray[35])}')
+            self.dataLabel3.setText(f'Gyro Y: {format_value(dataArray[36])}')
+            self.dataLabel4.setText(f'Gyro Z: {format_value(dataArray[37])}')
+            self.dataLabel5.setText(f'Acc X: {format_value(dataArray[38])}')
+            self.dataLabel6.setText(f'Acc Y: {format_value(dataArray[39])}')
+            self.dataLabel7.setText(f'Acc Z: {format_value(dataArray[40])}')
+            # Live Angle display:
+            self.dataLabel8.setText(f'Flex Angle (deg): {format_value(getFingerAngle(format_value(dataArray[5])))}')
