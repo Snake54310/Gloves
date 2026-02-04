@@ -192,20 +192,6 @@ void pcaselect(uint8_t i) {
 void calibration1() {
   delay(10);
 
-  shortFSMaxReading = analogRead(shortFSPin);
-  longFSMaxReading1 = analogRead(longFSPin1);
-  longFSMaxReading2 = analogRead(longFSPin2);
-  longFSMaxReading3 = analogRead(longFSPin3);
-  longFSMaxReading4 = analogRead(longFSPin4);
-
-  return;
-}
-
-//Calibration 2: Set maximum levels for flex sensors
-//    User must have hand in a fist with thumb tucked for proper calibration
-void calibration2() {
-  delay(10);
-
   shortFSMinReading = analogRead(shortFSPin);
   longFSMinReading1 = analogRead(longFSPin1);
   longFSMinReading2 = analogRead(longFSPin2);
@@ -215,9 +201,25 @@ void calibration2() {
   return;
 }
 
+//Calibration 2: Set maximum levels for flex sensors
+//    User must have hand in a fist with thumb tucked for proper calibration
+void calibration2() {
+  delay(10);
+
+  shortFSMaxReading = analogRead(shortFSPin);
+  longFSMaxReading1 = analogRead(longFSPin1);
+  longFSMaxReading2 = analogRead(longFSPin2);
+  longFSMaxReading3 = analogRead(longFSPin3);
+  longFSMaxReading4 = analogRead(longFSPin4);
+
+  return;
+}
+
 //sensorCalls: Read all sensors, print results over serial to be read by Python script
 void sensorCalls() {
   if (elapsedTime > samplePeriod){
+    elapsedTime = 0;  // CRITICAL FIX: Reset timer to maintain 10 Hz sampling rate
+    
     // Read flex sensors
     shortFSReading = analogRead(shortFSPin);
     longFSReading1 = analogRead(longFSPin1);
@@ -245,27 +247,32 @@ void sensorCalls() {
     //Select each IMU, read acceleration and gyro. In case of errors, output "E,E,E,E,E,E"
     //Thumb
     pcaselect(7);
-
+    delay(5);  // ADDED: Give I2C bus time to stabilize after channel switch
     icm.getEvent(&accel7, &gyro7, &temp7);
-    finger0Data =String(accel7.acceleration.x) + "," + String(accel7.acceleration.y) + "," + String(accel7.acceleration.z) + "," + String(gyro0.gyro.x) + "," + String(gyro0.gyro.y) + "," + String(gyro0.gyro.z) + ",";
+    finger0Data = String(accel7.acceleration.x) + "," + String(accel7.acceleration.y) + "," + String(accel7.acceleration.z) + "," + String(gyro7.gyro.x) + "," + String(gyro7.gyro.y) + "," + String(gyro7.gyro.z) + ",";
+    // FIXED: Changed gyro0 to gyro7 for thumb
 
     //Pointer
     pcaselect(3);
+    delay(5);  // ADDED: Delay after channel switch
     icm.getEvent(&accel3, &gyro3, &temp3);
     finger1Data = String(accel3.acceleration.x) + "," + String(accel3.acceleration.y) + "," + String(accel3.acceleration.z) + "," + String(gyro3.gyro.x) + "," + String(gyro3.gyro.y) + "," + String(gyro3.gyro.z) + ",";
 
     //Middle
     pcaselect(2);
+    delay(5);  // ADDED: Delay after channel switch
     icm.getEvent(&accel2, &gyro2, &temp2);
     finger2Data = String(accel2.acceleration.x) + "," + String(accel2.acceleration.y) + "," + String(accel2.acceleration.z) + "," + String(gyro2.gyro.x) + "," + String(gyro2.gyro.y) + "," + String(gyro2.gyro.z) + ",";
 
     //Ring
     pcaselect(1);
+    delay(5);  // ADDED: Delay after channel switch
     icm.getEvent(&accel1, &gyro1, &temp1);
     finger3Data = String(accel1.acceleration.x) + "," + String(accel1.acceleration.y) + "," + String(accel1.acceleration.z) + "," + String(gyro1.gyro.x) + "," + String(gyro1.gyro.y) + "," + String(gyro1.gyro.z) + ",";
 
     //Pinky
     pcaselect(0);
+    delay(5);  // ADDED: Delay after channel switch
     icm.getEvent(&accel0, &gyro0, &temp0);
     finger4Data = String(accel0.acceleration.x) + "," + String(accel0.acceleration.y) + "," + String(accel0.acceleration.z) + "," + String(gyro0.gyro.x) + "," + String(gyro0.gyro.y) + "," + String(gyro0.gyro.z) + ",";
 
@@ -274,18 +281,15 @@ void sensorCalls() {
       IMU.readAcceleration(palmAccX, palmAccY, palmAccZ);
       palmOutAcc = String(palmAccX) + "," + String(palmAccY) + "," + String(palmAccZ) + ",";
     } else {
-      Serial.print("E,E,E,"); 
+      palmOutAcc = "E,E,E,";  // FIXED: Store in variable instead of printing directly
     }
     if (IMU.gyroscopeAvailable()) {
       IMU.readGyroscope(palmGyroX, palmGyroY, palmGyroZ);
       palmOutGyro = String(palmGyroX) + "," + String(palmGyroY) + "," + String(palmGyroZ) + ",";
     } else {
-      Serial.print("E,E,E,");
+      palmOutGyro = "E,E,E,";  // FIXED: Store in variable instead of printing directly
     }
     
-    
-
-
     //Print data in CSV format over serial in the following format
     //  flex (each finger), acceleration XYZ, gyro XYZ (each finger), acceleration XYZ, gyro XYZ (wrist), hand type (L/R)
     Serial.println(fsOut + finger0Data + finger1Data + finger2Data + finger3Data + finger4Data + palmOutAcc + palmOutGyro + handType);
