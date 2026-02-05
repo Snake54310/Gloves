@@ -1,21 +1,17 @@
 from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QWidget, QGridLayout
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QVector3D, QQuaternion
 from PySide6.Qt3DCore import Qt3DCore
 from PySide6.Qt3DExtras import Qt3DExtras
-from PySide6.Qt3DRender import Qt3DRender
 from scipy import signal
 from collections import deque
 from RightHand import RightHand  # Assuming this is your hand model class
 import time
 import math
 
-# CRITICAL: Create QApplication instance ONCE at module level
-# This must exist before any Qt widgets are created
 app = QApplication.instance()
 if app is None:
     app = QApplication([])
-
 
 class LowPassFilter:
     def __init__(self, cutoff_freq=5, sample_rate=100, order=2):
@@ -37,152 +33,6 @@ class LowPassFilter:
             return filtered_value[0]
         except (ValueError, TypeError):
             return new_value
-
-
-class AnimationWindow(Qt3DExtras.Qt3DWindow):
-    def __init__(self):
-        super().__init__()
-        self.setTitle("Pointer Finger Display")
-        self.resize(900, 700)
-
-        # Root entity - MUST be created first
-        self.rootEntity = Qt3DCore.QEntity()
-
-        # Camera setup
-        camera = self.camera()
-        camera.lens().setPerspectiveProjection(45.0, 16.0 / 9.0, 0.1, 1000.0)
-        camera.setPosition(QVector3D(0, 0, 30.0))
-        camera.setViewCenter(QVector3D(0, 0, 0))
-        camera.setUpVector(QVector3D(0, 1, 0))
-
-        # Camera controller
-        camController = Qt3DExtras.QOrbitCameraController(self.rootEntity)
-        camController.setLinearSpeed(50.0)
-        camController.setLookSpeed(180.0)
-        camController.setCamera(camera)
-
-        # Create material
-        self.material = Qt3DExtras.QPhongMaterial(self.rootEntity)
-        self.material.setDiffuse(QColor(100, 150, 200))
-        self.material.setAmbient(QColor(50, 75, 100))
-        self.material.setSpecular(QColor(255, 255, 255))
-        self.material.setShininess(50.0)
-
-        # Add lighting
-        self.add_light(QVector3D(10, 10, 10), 1.0)
-        self.add_light(QVector3D(-10, 10, 10), 0.5)
-
-        # Create finger segments
-        self.create_finger_segments()
-
-        # IMPORTANT: Set root entity LAST
-        self.setRootEntity(self.rootEntity)
-
-    def add_light(self, position, intensity):
-        """Add a point light to the scene"""
-        lightEntity = Qt3DCore.QEntity(self.rootEntity)
-
-        light = Qt3DRender.QPointLight(lightEntity)
-        light.setColor(QColor(255, 255, 255))
-        light.setIntensity(intensity)
-
-        lightTransform = Qt3DCore.QTransform(lightEntity)
-        lightTransform.setTranslation(position)
-
-        lightEntity.addComponent(light)
-        lightEntity.addComponent(lightTransform)
-
-        return lightEntity
-
-    def create_finger_segments(self):
-        """Create the three finger segments"""
-        # Segment lengths
-        proximal_len = 8.0
-        middle_len = 6.0
-        distal_len = 4.0
-
-        # === PROXIMAL SEGMENT (base segment) ===
-        self.proximal_entity = Qt3DCore.QEntity(self.rootEntity)
-
-        proximal_mesh = Qt3DExtras.QCylinderMesh(self.proximal_entity)
-        proximal_mesh.setRadius(1.3)
-        proximal_mesh.setLength(proximal_len)
-        proximal_mesh.setRings(20)
-        proximal_mesh.setSlices(32)
-
-        # Transform for proximal - rotation happens here
-        self.proximal_transform = Qt3DCore.QTransform(self.proximal_entity)
-        # Cylinder is created along Y-axis, positioned so base is at origin
-        self.proximal_transform.setTranslation(QVector3D(0, proximal_len / 2, 0))
-
-        self.proximal_entity.addComponent(proximal_mesh)
-        self.proximal_entity.addComponent(self.proximal_transform)
-        self.proximal_entity.addComponent(self.material)
-
-        # === MIDDLE SEGMENT ===
-        # Parent to proximal entity
-        self.middle_entity = Qt3DCore.QEntity(self.proximal_entity)
-
-        middle_mesh = Qt3DExtras.QCylinderMesh(self.middle_entity)
-        middle_mesh.setRadius(1.1)
-        middle_mesh.setLength(middle_len)
-        middle_mesh.setRings(20)
-        middle_mesh.setSlices(32)
-
-        # Transform for middle - this is where rotation happens
-        self.middle_transform = Qt3DCore.QTransform(self.middle_entity)
-        # Position at the top of proximal segment (in proximal's local space)
-        # The pivot point is at the base of this cylinder
-        self.middle_transform.setTranslation(QVector3D(0, proximal_len / 2 + middle_len / 2, 0))
-
-        self.middle_entity.addComponent(middle_mesh)
-        self.middle_entity.addComponent(self.middle_transform)
-        self.middle_entity.addComponent(self.material)
-
-        # === DISTAL SEGMENT ===
-        # Parent to middle entity
-        self.distal_entity = Qt3DCore.QEntity(self.middle_entity)
-
-        distal_mesh = Qt3DExtras.QCylinderMesh(self.distal_entity)
-        distal_mesh.setRadius(0.9)
-        distal_mesh.setLength(distal_len)
-        distal_mesh.setRings(20)
-        distal_mesh.setSlices(32)
-
-        # Transform for distal - this is where rotation happens
-        self.distal_transform = Qt3DCore.QTransform(self.distal_entity)
-        # Position at the top of middle segment (in middle's local space)
-        self.distal_transform.setTranslation(QVector3D(0, middle_len / 2 + distal_len / 2, 0))
-
-        self.distal_entity.addComponent(distal_mesh)
-        self.distal_entity.addComponent(self.distal_transform)
-        self.distal_entity.addComponent(self.material)
-
-        # Store segment lengths for rotation calculations
-        self.proximal_len = proximal_len
-        self.middle_len = middle_len
-        self.distal_len = distal_len
-
-    def setAngles(self, middle_angle: float, distal_angle: float):
-        """
-        Set the bend angles for the finger segments.
-
-        Args:
-            middle_angle: Angle in degrees for the middle segment (0 = straight)
-            distal_angle: Angle in degrees for the distal segment (0 = straight)
-        """
-        # For the middle segment: rotate around X-axis at its base
-        middle_rotation = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), middle_angle)
-        self.middle_transform.setRotation(middle_rotation)
-        # Keep original translation
-        self.middle_transform.setTranslation(QVector3D(0, self.proximal_len / 2 + self.middle_len / 2, 0))
-
-        # For the distal segment: rotate around X-axis at its base
-        distal_rotation = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), distal_angle)
-        self.distal_transform.setRotation(distal_rotation)
-        # Keep original translation
-        self.distal_transform.setTranslation(QVector3D(0, self.middle_len / 2 + self.distal_len / 2, 0))
-
 
 class GloveMonitorWindow(QMainWindow):
     def __init__(self):
@@ -246,18 +96,8 @@ class GloveMonitorWindow(QMainWindow):
 
         self.setupLayout()
 
-        # Create animation window
         self.animationView = AnimationWindow()
-
-        # Setup a timer to process Qt events periodically
-        # This is CRITICAL for mixed Tkinter/PySide operation
-        self.event_timer = QTimer()
-        self.event_timer.timeout.connect(self.process_events)
-        self.event_timer.start(10)  # Process events every 10ms
-
-    def process_events(self):
-        """Process Qt events - necessary when running with Tkinter"""
-        QApplication.processEvents()
+        self.animationView.show()
 
     def initializeFilters(self, sample_rate, cutoff_freq=5):
         self.flex_filters = [LowPassFilter(cutoff_freq, sample_rate, order=2) for _ in range(5)]
@@ -318,13 +158,8 @@ class GloveMonitorWindow(QMainWindow):
 
     def initDisplay(self):
         self.show()
-        self.animationView.show()
 
     def terminateDisplay(self):
-        if self.event_timer:
-            self.event_timer.stop()
-        if self.animationView:
-            self.animationView.close()
         self.close()
 
     def updateData(self, data, timestamp):
@@ -402,14 +237,14 @@ class GloveMonitorWindow(QMainWindow):
         def getFingerAngle(value):
             try:
                 flex = float(value)
-                return 0.00001595 * flex ** 3 - 0.003083 * flex ** 2 + 0.4174 * flex + 0.8620
+                return 0.00001595 * flex**3 - 0.003083 * flex**2 + 0.4174 * flex + 0.8620
             except (ValueError, TypeError):
                 return '--'
 
         def getThumbAngle(value):
             try:
                 flex = float(value)
-                return 0.000005956 * flex ** 3 - 0.001171 * flex ** 2 + 0.2502 * flex + 2.747
+                return 0.000005956 * flex**3 - 0.001171 * flex**2 + 0.2502 * flex + 2.747
             except (ValueError, TypeError):
                 return '--'
 
@@ -419,8 +254,7 @@ class GloveMonitorWindow(QMainWindow):
             middleAngle = getFingerAngle(dataArray[2])
             ringAngle = getFingerAngle(dataArray[3])
             pinkyAngle = getFingerAngle(dataArray[4])
-            self.rightHand.setJ1Angles(thumbAngle, pointerAngle * 0.75, middleAngle * 0.75, ringAngle * 0.75,
-                                       pinkyAngle * 0.75)
+            self.rightHand.setJ1Angles(thumbAngle, pointerAngle * 0.75, middleAngle * 0.75, ringAngle * 0.75, pinkyAngle * 0.75)
             self.rightHand.setJ2Angles(pointerAngle * 0.25, middleAngle * 0.25, ringAngle * 0.25, pinkyAngle * 0.25)
 
             # Always update animation (not view-specific)
@@ -428,8 +262,8 @@ class GloveMonitorWindow(QMainWindow):
                 self.rightHand.pointer.getJ1Flex(),
                 self.rightHand.pointer.getJ2Flex()
             )
-        except (ValueError, TypeError) as e:
-            print(f"Waiting for Legible Flex Values: {e}")
+        except ValueError:
+            print("Waiting for Legible Flex Values")
 
         # View-specific label updates
         if self.currentView == 'Thumb':
@@ -484,3 +318,97 @@ class GloveMonitorWindow(QMainWindow):
             self.dataLabel5.setText(f'Acc X: {format_value(dataArray[38])}')
             self.dataLabel6.setText(f'Acc Y: {format_value(dataArray[39])}')
             self.dataLabel7.setText(f'Acc Z: {format_value(dataArray[40])}')
+
+class AnimationWindow(Qt3DExtras.Qt3DWindow):
+    def __init__(self):
+        super().__init__()
+        self.setTitle("Pointer Finger Display")
+        self.resize(900, 700)
+
+        self.camera().lens().setPerspectiveProjection(45, 16/9, 0.1, 1000)
+        self.camera().setPosition(QVector3D(0, 5, 25))
+        self.camera().setViewCenter(QVector3D(0, 5, 0))
+
+        self.rootEntity = Qt3DCore.QEntity()
+
+        cam_ctrl = Qt3DExtras.QOrbitCameraController(self.rootEntity)
+        cam_ctrl.setLinearSpeed(30)
+        cam_ctrl.setLookSpeed(120)
+        cam_ctrl.setCamera(self.camera())
+
+        self.base_entity = None
+        self.proximal_entity = None
+        self.middle_entity = None
+        self.distal_entity = None
+
+        self.seg1_tf = None
+        self.seg2_tf = None
+        self.seg3_tf = None
+
+        self.create_finger()
+        self.setRootEntity(self.rootEntity)
+
+    def create_finger(self):
+        # NO reassignment here - use the existing self.rootEntity
+
+        material = Qt3DExtras.QPhongMaterial(self.rootEntity)
+        material.setDiffuse(QColor(200, 200, 210))
+        material.setSpecular(QColor(255, 255, 255))
+        material.setShininess(30)
+
+        def make_segment(parent_entity, length, radius=1.0):
+            entity = Qt3DCore.QEntity(parent_entity)
+            mesh = Qt3DExtras.QCylinderMesh()
+            mesh.setRadius(radius)
+            mesh.setLength(length)
+            mesh.setRings(12)
+            mesh.setSlices(20)
+
+            tf = Qt3DCore.QTransform(entity)
+            tf.setTranslation(QVector3D(0, -length / 2, 0))
+
+            entity.addComponent(mesh)
+            entity.addComponent(tf)
+            entity.addComponent(material)
+            return entity, tf
+
+        # Base (keep reference)
+        self.base_entity = Qt3DCore.QEntity(self.rootEntity)
+        base_tf = Qt3DCore.QTransform()
+        base_tf.setTranslation(QVector3D(0, 0, 0))
+        self.base_entity.addComponent(base_tf)
+
+        # Proximal
+        self.proximal_entity, self.seg1_tf = make_segment(self.base_entity, length=8, radius=1.3)
+        self.apply_rotation(self.seg1_tf, 0)
+
+        # Middle
+        self.middle_entity, self.seg2_tf = make_segment(self.proximal_entity, length=6, radius=1.1)
+        seg2_offset = Qt3DCore.QTransform(self.middle_entity)
+        seg2_offset.setTranslation(QVector3D(0, 8, 0))
+        self.middle_entity.addComponent(seg2_offset)
+
+        # Distal
+        self.distal_entity, self.seg3_tf = make_segment(self.middle_entity, length=4, radius=0.9)
+        seg3_offset = Qt3DCore.QTransform(self.distal_entity)
+        seg3_offset.setTranslation(QVector3D(0, 6, 0))
+        self.distal_entity.addComponent(seg3_offset)
+
+        # Initial
+        self.setAngles(0, 0)
+
+    def apply_rotation(self, tf, degrees):
+        if tf is not None:
+            q = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), degrees)
+            tf.setRotation(q)
+
+    def setAngles(self, middle: float, distal: float):
+        self.apply_rotation(self.seg2_tf, middle)
+        self.apply_rotation(self.seg3_tf, distal)
+
+# Example main (add this if not already in your script)
+if __name__ == '__main__':
+    window = GloveMonitorWindow()
+    window.initDisplay()  # Show the main window
+    # Test with fake data: window.updateData('100,200,300,...', time.time())  # Fill with 42 values
+    app.exec()
