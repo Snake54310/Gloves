@@ -276,10 +276,31 @@ class GloveMonitorWindow(QMainWindow):
             self.rightHand.setJ2Angles(pointerAngle * 0.25, middleAngle * 0.25, ringAngle * 0.25, pinkyAngle * 0.25)
 
             # Update displayed finger angles
-            self.animationView.setAngles(
-                self.rightHand.pointer.getJ1Flex(),
-                self.rightHand.pointer.getJ2Flex()
+            j1Angles = self.rightHand.getJ1Angles()
+            j2Angles = self.rightHand.getJ2Angles()
+            self.animationView.setAnglesPointer(
+                j1Angles[1],
+                j2Angles[0]
             )
+
+            self.animationView.setAnglesMiddle(
+                j1Angles[2],
+                j2Angles[1]
+            )
+
+            self.animationView.setAnglesRing(
+                j1Angles[3],
+                j2Angles[2]
+            )
+
+            self.animationView.setAnglesPinky(
+                j1Angles[4],
+                j2Angles[3]
+            )
+            self.animationView.setAngleThumb(
+                j1Angles[0]
+            )
+
         except (ValueError, TypeError) as e:
             print(f"Waiting for Legible Flex Values: {e}")
 
