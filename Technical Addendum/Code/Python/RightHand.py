@@ -129,6 +129,10 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         self.middle = Middle(2.5, 1.375, 1.0)
         self.ring = Ring(2.25, 1.375, 1.0)
         self.pinky = Pinky(1.375, 1.0, 1.0)
+        self.wristGyroDegX = 0
+        self.wristGyroDegY = 0
+        self.wristGyroDegZ = 0
+        self.sampleRate = 10
 
     def setJ1Angles(self, thumbFlex, pointerFlex, middleFlex, ringFlex, pinkyFlex):
         self.thumb.setJ1Flex(thumbFlex)
@@ -151,8 +155,23 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         j2Angles = [self.pointer.getJ2Flex(), self.middle.getJ2Flex(), self.ring.getJ2Flex(), self.pinky.getJ2Flex()]
         return j2Angles
 
+    def updateSampleRate(self, newRate):
+        self.sampleRate = newRate
+        return
+    def updateOrientation(self, wristGyroRadssX, wristGyroRadssY, wristGyroRadssZ):
+        self.wristGyroDegX = (self.wristGyroDegX + ((wristGyroRadssX / self.sampleRate) * 180 / math.pi) + 360) % 360
+        self.wristGyroDegY = (self.wristGyroDegY + ((wristGyroRadssY / self.sampleRate) * 180 / math.pi) + 360) % 360
+        self.wristGyroDegZ = (self.wristGyroDegZ + ((wristGyroRadssZ / self.sampleRate) * 180 / math.pi) + 360) % 360
+        return
 
+    def zeroOrientation(self):
+        self.wristGyroDegX = 0
+        self.wristGyroDegY = 0
+        self.wristGyroDegZ = 0
+        return
 
+    def getOrientation(self):
+        return [self.wristGyroDegX, self.wristGyroDegY, self.wristGyroDegZ]
 
 
 
