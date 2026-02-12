@@ -75,6 +75,37 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
 
     def create_finger_segments(self):
 
+        # -------------------------------------------- PALM INITIALIZATION ---------------------------
+
+        self.entity_Palm = Qt3DCore.QEntity(self.rootEntity)
+
+        mesh_Palm = Qt3DExtras.QCylinderMesh(self.entity_Palm)
+        palm_radius = 8
+
+        # sets radius of cylinder mesh
+        mesh_Palm.setRadius(palm_radius)
+        # sets length of cylinder mesh
+        mesh_Palm.setLength(4)
+        # sets number of subdivisions along length (around radius) to smooth rendering
+        mesh_Palm.setRings(10)
+        # sets number of subdivisions around the circumference to make shape more cylindrical
+        mesh_Palm.setSlices(64)
+
+        # Transform for proximal - rotation happens here
+        self.transform_Palm = Qt3DCore.QTransform(self.entity_Palm)
+        # Cylinder is created along Z-axis, positioned so base is at Center of Fingers/thumb
+        self.transform_Palm.setTranslation(QVector3D(5, -10, 0))
+
+        # rotate around X-axis to face upward
+        rotation_Palm = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), 90)
+        self.transform_Palm.setRotation(rotation_Palm)
+
+        self.entity_Palm.addComponent(mesh_Palm)
+        self.entity_Palm.addComponent(self.transform_Palm)
+        self.entity_Palm.addComponent(self.material)
+
+        # -------------------------------------------- END PALM INITIALIZATION ---------------------------
+
         # -------------------------------------------- POINTER FINGER INITIALIZATION ----------------------------------
         """Create the three finger segments"""
         # Segment lengths (pointer Finger)
@@ -83,7 +114,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         distal_len_Pointer = 4.0
 
         # === PROXIMAL SEGMENT (base segment) For Pointer Finger ===
-        self.proximal_entity_Pointer = Qt3DCore.QEntity(self.rootEntity)
+        self.proximal_entity_Pointer = Qt3DCore.QEntity(self.entity_Palm)
 
         proximal_mesh_Pointer = Qt3DExtras.QCylinderMesh(self.proximal_entity_Pointer)
         # sets radius of cylinder mesh
@@ -96,12 +127,17 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         proximal_mesh_Pointer.setSlices(32)
 
         # Transform for proximal - rotation happens here
-        self.proximal_transform = Qt3DCore.QTransform(self.proximal_entity_Pointer)
+        self.proximal_transform_Pointer = Qt3DCore.QTransform(self.proximal_entity_Pointer)
+
         # Cylinder is created along Y-axis, positioned so base is at origin
-        self.proximal_transform.setTranslation(QVector3D(0, proximal_len_Pointer / 2, 0))
+        self.proximal_transform_Pointer.setTranslation(QVector3D(-4, 0, -(palm_radius + proximal_len_Pointer / 2)))
+
+        # rotate around X-axis to face forward
+        rotation_Pointer = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), 90)
+        self.proximal_transform_Pointer.setRotation(rotation_Pointer)
 
         self.proximal_entity_Pointer.addComponent(proximal_mesh_Pointer)
-        self.proximal_entity_Pointer.addComponent(self.proximal_transform)
+        self.proximal_entity_Pointer.addComponent(self.proximal_transform_Pointer)
         self.proximal_entity_Pointer.addComponent(self.material)
 
         # === MIDDLE SEGMENT For Pointer Finger ===
@@ -166,7 +202,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         distal_len_Middle = 4.0
 
         # === PROXIMAL SEGMENT (base segment) For Middle Finger ===
-        self.proximal_entity_Middle = Qt3DCore.QEntity(self.rootEntity)
+        self.proximal_entity_Middle = Qt3DCore.QEntity(self.entity_Palm)
 
         proximal_mesh_Middle = Qt3DExtras.QCylinderMesh(self.proximal_entity_Middle)
         # sets radius of cylinder mesh
@@ -179,13 +215,17 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         proximal_mesh_Middle.setSlices(32)
 
         # Transform for proximal - rotation happens here
-        self.proximal_transform = Qt3DCore.QTransform(self.proximal_entity_Middle)
+        self.proximal_transform_Middle = Qt3DCore.QTransform(self.proximal_entity_Middle)
         # Cylinder is created along Y-axis, positioned so base is at origin
-        self.proximal_transform.setTranslation(QVector3D(4, proximal_len_Middle / 2, 0))
+        self.proximal_transform_Middle.setTranslation(QVector3D(0, 0, -(palm_radius + proximal_len_Middle / 2)))
 
         self.proximal_entity_Middle.addComponent(proximal_mesh_Middle)
-        self.proximal_entity_Middle.addComponent(self.proximal_transform)
+        self.proximal_entity_Middle.addComponent(self.proximal_transform_Middle)
         self.proximal_entity_Middle.addComponent(self.material)
+
+        # rotate around X-axis to face forward
+        rotation_Middle = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), 90)
+        self.proximal_transform_Middle.setRotation(rotation_Middle)
 
         # === MIDDLE SEGMENT For Middle Finger ===
         # Parent to proximal entity
@@ -249,7 +289,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         distal_len_Ring = 4.0
 
         # === PROXIMAL SEGMENT (base segment) For Ring Finger ===
-        self.proximal_entity_Ring = Qt3DCore.QEntity(self.rootEntity)
+        self.proximal_entity_Ring = Qt3DCore.QEntity(self.entity_Palm)
 
         proximal_mesh_Ring = Qt3DExtras.QCylinderMesh(self.proximal_entity_Ring)
         # sets radius of cylinder mesh
@@ -262,13 +302,17 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         proximal_mesh_Ring.setSlices(32)
 
         # Transform for proximal - rotation happens here
-        self.proximal_transform = Qt3DCore.QTransform(self.proximal_entity_Ring)
+        self.proximal_transform_Ring = Qt3DCore.QTransform(self.proximal_entity_Ring)
         # Cylinder is created along Y-axis, positioned so base is at origin
-        self.proximal_transform.setTranslation(QVector3D(8, proximal_len_Ring / 2, 0))
+        self.proximal_transform_Ring.setTranslation(QVector3D(4, 0, -(palm_radius + proximal_len_Ring / 2)))
 
         self.proximal_entity_Ring.addComponent(proximal_mesh_Ring)
-        self.proximal_entity_Ring.addComponent(self.proximal_transform)
+        self.proximal_entity_Ring.addComponent(self.proximal_transform_Ring)
         self.proximal_entity_Ring.addComponent(self.material)
+
+        # rotate around X-axis to face forward
+        rotation_Ring = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), 90)
+        self.proximal_transform_Ring.setRotation(rotation_Ring)
 
         # === MIDDLE SEGMENT For Ring Finger ===
         # Parent to proximal entity
@@ -332,7 +376,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         distal_len_Pinky = 4.0
 
         # === PROXIMAL SEGMENT (base segment) For Pinky Finger ===
-        self.proximal_entity_Pinky = Qt3DCore.QEntity(self.rootEntity)
+        self.proximal_entity_Pinky = Qt3DCore.QEntity(self.entity_Palm)
 
         proximal_mesh_Pinky = Qt3DExtras.QCylinderMesh(self.proximal_entity_Pinky)
         # sets radius of cylinder mesh
@@ -345,13 +389,17 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         proximal_mesh_Pinky.setSlices(32)
 
         # Transform for proximal - rotation happens here
-        self.proximal_transform = Qt3DCore.QTransform(self.proximal_entity_Pinky)
+        self.proximal_transform_Pinky = Qt3DCore.QTransform(self.proximal_entity_Pinky)
         # Cylinder is created along Y-axis, positioned so base is at origin
-        self.proximal_transform.setTranslation(QVector3D(12, proximal_len_Pinky / 2, 0))
+        self.proximal_transform_Pinky.setTranslation(QVector3D(8, 0, -(palm_radius + proximal_len_Pinky / 2)))
 
         self.proximal_entity_Pinky.addComponent(proximal_mesh_Pinky)
-        self.proximal_entity_Pinky.addComponent(self.proximal_transform)
+        self.proximal_entity_Pinky.addComponent(self.proximal_transform_Pinky)
         self.proximal_entity_Pinky.addComponent(self.material)
+
+        # rotate around X-axis to face forward
+        rotation_Pinky = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), 90)
+        self.proximal_transform_Pinky.setRotation(rotation_Pinky)
 
         # === MIDDLE SEGMENT For Pinky Finger ===
         # Parent to proximal entity
@@ -414,7 +462,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         distal_len_Thumb = 5.75
 
         # === PROXIMAL SEGMENT (base segment) For Thumb Finger ===
-        self.proximal_entity_Thumb = Qt3DCore.QEntity(self.rootEntity)
+        self.proximal_entity_Thumb = Qt3DCore.QEntity(self.entity_Palm)
 
         proximal_mesh_Thumb = Qt3DExtras.QCylinderMesh(self.proximal_entity_Thumb)
         # sets radius of cylinder mesh
@@ -427,13 +475,17 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         proximal_mesh_Thumb.setSlices(32)
 
         # Transform for proximal - rotation happens here
-        self.proximal_transform = Qt3DCore.QTransform(self.proximal_entity_Thumb)
+        self.proximal_transform_Thumb = Qt3DCore.QTransform(self.proximal_entity_Thumb)
         # Cylinder is created along Y-axis, positioned so base is at origin
-        self.proximal_transform.setTranslation(QVector3D(-6, proximal_len_Thumb / 2 - 10, 0))
+        self.proximal_transform_Thumb.setTranslation(QVector3D(-10, 0, -(palm_radius + proximal_len_Thumb / 2 - 10)))
 
         self.proximal_entity_Thumb.addComponent(proximal_mesh_Thumb)
-        self.proximal_entity_Thumb.addComponent(self.proximal_transform)
+        self.proximal_entity_Thumb.addComponent(self.proximal_transform_Thumb)
         self.proximal_entity_Thumb.addComponent(self.material)
+
+        # rotate around X-axis to face forward
+        rotation_Thumb = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), 90)
+        self.proximal_transform_Thumb.setRotation(rotation_Thumb)
 
         # === DISTAL SEGMENT For Thumb Finger ===
         # Parent to middle entity
@@ -464,36 +516,6 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
 
         # -------------------------------------------- END THUMB FINGER INITIALIZATION -----------------------------
 
-        # -------------------------------------------- PALM INITIALIZATION ---------------------------
-
-        self.entity_Palm = Qt3DCore.QEntity(self.rootEntity)
-
-        mesh_Palm = Qt3DExtras.QCylinderMesh(self.entity_Palm)
-
-        # sets radius of cylinder mesh
-        mesh_Palm.setRadius(8)
-        # sets length of cylinder mesh
-        mesh_Palm.setLength(4)
-        # sets number of subdivisions along length (around radius) to smooth rendering
-        mesh_Palm.setRings(10)
-        # sets number of subdivisions around the circumference to make shape more cylindrical
-        mesh_Palm.setSlices(64)
-
-        # Transform for proximal - rotation happens here
-        self.transform_Palm = Qt3DCore.QTransform(self.entity_Palm)
-        # Cylinder is created along Z-axis, positioned so base is at Center of Fingers/thumb
-        self.transform_Palm.setTranslation(QVector3D(5, -10, 0))
-
-        # rotate around X-axis to face upward
-        rotation_Palm = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), 90)
-        self.transform_Palm.setRotation(rotation_Palm)
-
-        self.entity_Palm.addComponent(mesh_Palm)
-        self.entity_Palm.addComponent(self.transform_Palm)
-        self.entity_Palm.addComponent(self.material)
-
-        # -------------------------------------------- END PALM INITIALIZATION ---------------------------
-
     def setAnglesPointer(self, middle_angle: float, distal_angle: float):
         """
         Set the bend angles for the finger segments.
@@ -509,7 +531,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.middle_transform_Pointer.setRotation(middle_rotation)
 
         # Keep original translation on middle segment
-        self.middle_transform_Pointer.setTranslation(QVector3D(0, self.proximal_len_Pointer / 2 + self.middle_len_Pointer / 2, 0))
+        #self.middle_transform_Pointer.setTranslation(QVector3D(0, self.proximal_len_Pointer / 2 + self.middle_len_Pointer / 2, 0))
 
         # For the distal segment: rotate around negative X-axis at its base (fingers curl down)
         distal_rotation = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), distal_angle)
@@ -518,7 +540,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.distal_transform_Pointer.setRotation(distal_rotation)
 
         # Keep original translation
-        self.distal_transform_Pointer.setTranslation(QVector3D(0, self.middle_len_Pointer / 2 + self.distal_len_Pointer / 2, 0))
+        #self.distal_transform_Pointer.setTranslation(QVector3D(0, self.middle_len_Pointer / 2 + self.distal_len_Pointer / 2, 0))
 
     def setAnglesMiddle(self, middle_angle: float, distal_angle: float):
         """
@@ -535,7 +557,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.middle_transform_Middle.setRotation(middle_rotation)
 
         # Keep original translation on middle segment
-        self.middle_transform_Middle.setTranslation(QVector3D(0, self.proximal_len_Middle / 2 + self.middle_len_Middle / 2, 0))
+        #self.middle_transform_Middle.setTranslation(QVector3D(0, self.proximal_len_Middle / 2 + self.middle_len_Middle / 2, 0))
 
         # For the distal segment: rotate around negative X-axis at its base (fingers curl down)
         distal_rotation = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), distal_angle)
@@ -544,7 +566,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.distal_transform_Middle.setRotation(distal_rotation)
 
         # Keep original translation
-        self.distal_transform_Middle.setTranslation(QVector3D(0, self.middle_len_Middle / 2 + self.distal_len_Middle / 2, 0))
+        #self.distal_transform_Middle.setTranslation(QVector3D(0, self.middle_len_Middle / 2 + self.distal_len_Middle / 2, 0))
 
     def setAnglesRing(self, middle_angle: float, distal_angle: float):
             """
@@ -561,8 +583,8 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
             self.middle_transform_Ring.setRotation(middle_rotation)
 
             # Keep original translation on middle segment
-            self.middle_transform_Ring.setTranslation(
-                QVector3D(0, self.proximal_len_Ring / 2 + self.middle_len_Ring / 2, 0))
+            #self.middle_transform_Ring.setTranslation(
+                #QVector3D(0, self.proximal_len_Ring / 2 + self.middle_len_Ring / 2, 0))
 
             # For the distal segment: rotate around negative X-axis at its base (fingers curl down)
             distal_rotation = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), distal_angle)
@@ -571,8 +593,8 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
             self.distal_transform_Ring.setRotation(distal_rotation)
 
             # Keep original translation
-            self.distal_transform_Ring.setTranslation(
-                QVector3D(0, self.middle_len_Ring / 2 + self.distal_len_Ring / 2, 0))
+            #self.distal_transform_Ring.setTranslation(
+                #QVector3D(0, self.middle_len_Ring / 2 + self.distal_len_Ring / 2, 0))
 
     def setAnglesPinky(self, middle_angle: float, distal_angle: float):
         """
@@ -589,8 +611,8 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.middle_transform_Pinky.setRotation(middle_rotation)
 
         # Keep original translation on middle segment
-        self.middle_transform_Pinky.setTranslation(
-            QVector3D(0, self.proximal_len_Pinky / 2 + self.middle_len_Pinky / 2, 0))
+        #self.middle_transform_Pinky.setTranslation(
+            #QVector3D(0, self.proximal_len_Pinky / 2 + self.middle_len_Pinky / 2, 0))
 
         # For the distal segment: rotate around negative X-axis at its base (fingers curl down)
         distal_rotation = QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), distal_angle)
@@ -599,8 +621,8 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.distal_transform_Pinky.setRotation(distal_rotation)
 
         # Keep original translation
-        self.distal_transform_Pinky.setTranslation(
-            QVector3D(0, self.middle_len_Pinky / 2 + self.distal_len_Pinky / 2, 0))
+        #self.distal_transform_Pinky.setTranslation(
+            #QVector3D(0, self.middle_len_Pinky / 2 + self.distal_len_Pinky / 2, 0))
 
     def setAngleThumb(self, distal_angle: float):
         """
@@ -618,5 +640,24 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.distal_transform_Thumb.setRotation(distal_rotation)
 
         # Keep original translation
-        self.distal_transform_Thumb.setTranslation(
-            QVector3D(0, self.distal_len_Thumb / 2, 0))
+        #self.distal_transform_Thumb.setTranslation(
+            #QVector3D(0, self.distal_len_Thumb / 2, 0))
+
+    def setOrientationPalm(self, X_rotation: float, Y_rotation: float, Z_rotation: float):
+        # NOTE: SENSOR X_rotation on wrist is in -X direction in animation window (e.g. 340 degrees sensor => 20 degrees animation).
+        # NOTE: Sensor Y and Z rotations are swapped
+        # NOTE: After swapping Sensor Y and Z with window Z and Y, Sensor data for Z in window is reversed (-Z direction)
+
+        X_rotation_window = ((360 - X_rotation) + 90) % 360
+        wrist_X_rotation = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), X_rotation_window)
+
+        Y_rotation_window = Z_rotation
+        wrist_Y_rotation = QQuaternion.fromAxisAndAngle(QVector3D(0, 1, 0), Y_rotation_window)
+
+        Z_rotation_window = 360 - Y_rotation
+        wrist_Z_rotation = QQuaternion.fromAxisAndAngle(QVector3D(0, 0, 1), Z_rotation_window)
+
+        wrist_rotation = wrist_X_rotation * wrist_Y_rotation * wrist_Z_rotation
+        self.transform_Palm.setRotation(wrist_rotation)
+
+        return

@@ -331,19 +331,46 @@ class GloveMonitorWindow(QMainWindow):
             except (ValueError, TypeError):
                 return '--'
 
-        try:
-            # get finger angles, convert to joint-based information
-            # and store as variables of right-hand object
-            thumbAngle = getThumbAngle(dataArray[0])
-            pointerAngle = getFingerAngle(dataArray[1])
-            middleAngle = getFingerAngle(dataArray[2])
-            ringAngle = getFingerAngle(dataArray[3])
-            pinkyAngle = getFingerAngle(dataArray[4])
+        def updateAnimation(dataArray):
+            try:
+                # get finger angles, convert to joint-based information
+                # and store as variables of right-hand object
+                thumbAngle = getThumbAngle(dataArray[0])
+                pointerAngle = getFingerAngle(dataArray[1])
+                middleAngle = getFingerAngle(dataArray[2])
+                ringAngle = getFingerAngle(dataArray[3])
+                pinkyAngle = getFingerAngle(dataArray[4])
 
-            self.rightHand.setJ1Angles(thumbAngle, pointerAngle * 0.75, middleAngle * 0.75,
-                                       ringAngle * 0.75, pinkyAngle * 0.75)
-            self.rightHand.setJ2Angles(pointerAngle * 0.25, middleAngle * 0.25,
-                                       ringAngle * 0.25, pinkyAngle * 0.25)
+                self.rightHand.setJ1Angles(thumbAngle, pointerAngle * 0.75, middleAngle * 0.75,
+                                           ringAngle * 0.75, pinkyAngle * 0.75)
+                self.rightHand.setJ2Angles(pointerAngle * 0.25, middleAngle * 0.25,
+                                           ringAngle * 0.25, pinkyAngle * 0.25)
+
+                # Update displayed finger angles
+                j1Angles = self.rightHand.getJ1Angles()
+                j2Angles = self.rightHand.getJ2Angles()
+
+                self.animationView.setAnglesPointer(j1Angles[1], j2Angles[0])
+                self.animationView.setAnglesMiddle(j1Angles[2], j2Angles[1])
+                self.animationView.setAnglesRing(j1Angles[3], j2Angles[2])
+                self.animationView.setAnglesPinky(j1Angles[4], j2Angles[3])
+                self.animationView.setAngleThumb(j1Angles[0])
+
+            except (ValueError, TypeError) as e:
+                print(f"Waiting for Legible Flex Values: {e}")
+                return
+
+            try:
+                self.rightHand.updateSampleRate(self.estimated_sample_rate)
+                self.rightHand.updateOrientation(float(dataArray[38]), float(dataArray[39]), float(dataArray[40]))
+            except (ValueError, TypeError) as e:
+                print(f"Waiting for Gyro Read: {e}")
+                return
+
+            # Update Displayed Wrist Orientation
+            wristXYZ = self.rightHand.getOrientation()
+
+            self.animationView.setOrientationPalm(wristXYZ[0], wristXYZ[1], wristXYZ[2])
 
             # Update displayed finger angles
             j1Angles = self.rightHand.getJ1Angles()
@@ -355,14 +382,7 @@ class GloveMonitorWindow(QMainWindow):
             self.animationView.setAnglesPinky(j1Angles[4], j2Angles[3])
             self.animationView.setAngleThumb(j1Angles[0])
 
-        except (ValueError, TypeError) as e:
-            print(f"Waiting for Legible Flex Values: {e}")
-
-        try:
-            self.rightHand.updateSampleRate(self.estimated_sample_rate)
-            self.rightHand.updateOrientation(float(dataArray[38]), float(dataArray[39]), float(dataArray[40]))
-        except (ValueError, TypeError) as e:
-            print(f"Waiting for Gyro Read: {e}")
+        updateAnimation(dataArray)
 
         # View-specific label updates
         if self.currentView == 'Thumb':
