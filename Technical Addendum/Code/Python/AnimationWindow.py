@@ -648,16 +648,110 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         # NOTE: Sensor Y and Z rotations are swapped
         # NOTE: After swapping Sensor Y and Z with window Z and Y, Sensor data for Z in window is reversed (-Z direction)
 
-        X_rotation_window = ((360 - X_rotation) + 90) % 360
+        X_rotation_window = X_rotation # ((360 - X_rotation) + 90) % 360
         wrist_X_rotation = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), X_rotation_window)
 
-        Y_rotation_window = Z_rotation
+        Y_rotation_window = Y_rotation # Z_rotation
         wrist_Y_rotation = QQuaternion.fromAxisAndAngle(QVector3D(0, 1, 0), Y_rotation_window)
 
-        Z_rotation_window = 360 - Y_rotation
+        Z_rotation_window = Z_rotation # 360 - Y_rotation
         wrist_Z_rotation = QQuaternion.fromAxisAndAngle(QVector3D(0, 0, 1), Z_rotation_window)
 
         wrist_rotation = wrist_X_rotation * wrist_Y_rotation * wrist_Z_rotation
         self.transform_Palm.setRotation(wrist_rotation)
+
+        return
+
+    def setOrientationFingers(self, j0Angles):
+
+        [thumbJ0X, thumbJ0Y, thumbJ0Z, pointerJ0X, pointerJ0Y, pointerJ0Z, middleJ0X, middleJ0Y, middleJ0Z,
+         ringJ0X, ringJ0Y, ringJ0Z, pinkyJ0X, pinkyJ0Y, pinkyJ0Z] = j0Angles
+
+        [thumbJ0X, thumbJ0Y, thumbJ0Z, pointerJ0X, pointerJ0Y, pointerJ0Z, middleJ0X, middleJ0Y, middleJ0Z,
+         ringJ0X, ringJ0Y, ringJ0Z, pinkyJ0X, pinkyJ0Y, pinkyJ0Z] = j0Angles
+
+        X_rotation_Thumb_window = thumbJ0X + 270
+        rotation_Thumb = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), X_rotation_Thumb_window)
+        Y_rotation_Thumb_window = thumbJ0Y
+        rotation_Thumb = rotation_Thumb * QQuaternion.fromAxisAndAngle(QVector3D(0, 1, 0), Y_rotation_Thumb_window)
+        Z_rotation_Thumb_window = thumbJ0Z
+        rotation_Thumb = rotation_Thumb * QQuaternion.fromAxisAndAngle(QVector3D(0, 0, 1), Z_rotation_Thumb_window)
+        self.proximal_transform_Thumb.setRotation(rotation_Thumb)
+
+        X_rotation_Pointer_window = pointerJ0X + 270
+        rotation_Pointer = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), X_rotation_Pointer_window)
+        Y_rotation_Pointer_window = pointerJ0Y
+        rotation_Pointer = rotation_Pointer * QQuaternion.fromAxisAndAngle(QVector3D(0, 1, 0),
+                                                                           Y_rotation_Pointer_window)
+        Z_rotation_Pointer_window = pointerJ0Z
+        rotation_Pointer = rotation_Pointer * QQuaternion.fromAxisAndAngle(QVector3D(0, 0, 1),
+                                                                           Z_rotation_Pointer_window)
+        self.proximal_transform_Pointer.setRotation(rotation_Pointer)
+
+        X_rotation_Middle_window = middleJ0X + 270
+        rotation_Middle = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), X_rotation_Middle_window)
+        Y_rotation_Middle_window = middleJ0Y
+        rotation_Middle = rotation_Middle * QQuaternion.fromAxisAndAngle(QVector3D(0, 1, 0), Y_rotation_Middle_window)
+        Z_rotation_Middle_window = middleJ0Z
+        rotation_Middle = rotation_Middle * QQuaternion.fromAxisAndAngle(QVector3D(0, 0, 1), Z_rotation_Middle_window)
+        self.proximal_transform_Middle.setRotation(rotation_Middle)
+
+        X_rotation_Ring_window = ringJ0X + 270
+        rotation_Ring = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), X_rotation_Ring_window)
+        Y_rotation_Ring_window = ringJ0Y
+        rotation_Ring = rotation_Ring * QQuaternion.fromAxisAndAngle(QVector3D(0, 1, 0), Y_rotation_Ring_window)
+        Z_rotation_Ring_window = ringJ0Z
+        rotation_Ring = rotation_Ring * QQuaternion.fromAxisAndAngle(QVector3D(0, 0, 1), Z_rotation_Ring_window)
+        self.proximal_transform_Ring.setRotation(rotation_Ring)
+
+        X_rotation_Pinky_window = pinkyJ0X + 270
+        rotation_Pinky = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), X_rotation_Pinky_window)
+        Y_rotation_Pinky_window = pinkyJ0Y
+        rotation_Pinky = rotation_Pinky * QQuaternion.fromAxisAndAngle(QVector3D(0, 1, 0), Y_rotation_Pinky_window)
+        Z_rotation_Pinky_window = pinkyJ0Z
+        rotation_Pinky = rotation_Pinky * QQuaternion.fromAxisAndAngle(QVector3D(0, 0, 1), Z_rotation_Pinky_window)
+        self.proximal_transform_Pinky.setRotation(rotation_Pinky)
+
+        # transforms around relative axis of rooted position
+        # (for example, bending fingers after rotating hand causes a bend around a relative X-axis and not the window's absolute X-axis):
+        #rotation_Pointer = QQuaternion.fromEulerAngles(pointerJ0X + 270, pointerJ0Y, pointerJ0Z)
+        #self.proximal_transform_Pointer.setRotation(rotation_Pointer)
+
+        # However, because we are using absolute relative angles between wrist and proximal segment, we must bend from relative angles
+        # around absolute window axis:
+
+        # Get the parent (root/wrist) entity's current world-space rotation
+        '''
+        parentWorldRotation = self.transform_Palm.rotation()
+        parentWorldRotationInv = parentWorldRotation.inverted()
+
+        # Build the absolute world-space target rotation for each finger
+        # by composing rotations around world X, Y, Z axes in order
+        restPose = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), 270)
+
+        def absoluteToLocal(absX, absY, absZ, parentRot, parentInv):
+            # Build the angular offset in world space
+            angularOffset = (
+                    QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), absX) *
+                    QQuaternion.fromAxisAndAngle(QVector3D(0, 1, 0), absY) *
+                    QQuaternion.fromAxisAndAngle(QVector3D(0, 0, 1), absZ)
+            )
+            # Zero reference is parent orientation, not world identity
+            absoluteTarget = angularOffset * parentRot
+            dynamicLocal = parentInv * absoluteTarget
+            return dynamicLocal * restPose
+
+        rotation_Pointer = absoluteToLocal(pointerJ0X, pointerJ0Y, pointerJ0Z, parentWorldRotation, parentWorldRotationInv)
+        rotation_Middle = absoluteToLocal(middleJ0X, middleJ0Y, middleJ0Z, parentWorldRotation, parentWorldRotationInv)
+        rotation_Ring = absoluteToLocal(ringJ0X, ringJ0Y, ringJ0Z, parentWorldRotation, parentWorldRotationInv)
+        rotation_Pinky = absoluteToLocal(pinkyJ0X, pinkyJ0Y, pinkyJ0Z, parentWorldRotation, parentWorldRotationInv)
+        rotation_Thumb = absoluteToLocal(thumbJ0X, thumbJ0Y, thumbJ0Z, parentWorldRotation, parentWorldRotationInv)
+
+        self.proximal_transform_Pointer.setRotation(rotation_Pointer)
+        #self.proximal_transform_Middle.setRotation(rotation_Middle)
+        #self.proximal_transform_Ring.setRotation(rotation_Ring)
+        #self.proximal_transform_Pinky.setRotation(rotation_Pinky)
+        #self.proximal_transform_Thumb.setRotation(rotation_Thumb)
+        '''
 
         return

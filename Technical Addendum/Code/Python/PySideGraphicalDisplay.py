@@ -363,6 +363,12 @@ class GloveMonitorWindow(QMainWindow):
             try:
                 self.rightHand.updateSampleRate(self.estimated_sample_rate)
                 self.rightHand.updateOrientation(float(dataArray[38]), float(dataArray[39]), float(dataArray[40]))
+                self.rightHand.updateOrientationFingers(float(dataArray[8]), float(dataArray[9]), float(dataArray[10]), # Thumb
+                                                        float(dataArray[14]), float(dataArray[15]), float(dataArray[16]), # Pointer
+                                                        float(dataArray[20]), float(dataArray[21]), float(dataArray[22]), # Middle
+                                                        float(dataArray[26]), float(dataArray[27]), float(dataArray[28]),  # Ring
+                                                        float(dataArray[32]), float(dataArray[33]), float(dataArray[34])   # Pinky
+                                                        )
             except (ValueError, TypeError) as e:
                 print(f"Waiting for Gyro Read: {e}")
                 return
@@ -371,6 +377,10 @@ class GloveMonitorWindow(QMainWindow):
             wristXYZ = self.rightHand.getOrientation()
 
             self.animationView.setOrientationPalm(wristXYZ[0], wristXYZ[1], wristXYZ[2])
+
+            j0Angles = self.rightHand.getRelativeOrientations()
+
+            self.animationView.setOrientationFingers(j0Angles)
 
             # Update displayed finger angles
             j1Angles = self.rightHand.getJ1Angles()
