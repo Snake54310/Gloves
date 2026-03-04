@@ -6,6 +6,7 @@ from RightHand import RightHand  # Assuming this is your hand model class
 import time
 from AnimationWindow import AnimationWindow
 import math
+from csv import DictWriter
 
 # CRITICAL: Create QApplication instance ONCE at module level
 # This must exist before any Qt widgets are created
@@ -121,6 +122,16 @@ class GloveMonitorWindow(QMainWindow):
         self.event_timer.timeout.connect(self.process_events)
         self.event_timer.start(10)  # Process events every 10ms
 
+        # Temporary code for getting gyroscope data
+        self.session = 0
+        self.recordWristGyro = False
+        self.beginWristGyro = False
+        self.endWristGyro = False
+
+        self.gyroRecordButton = QPushButton("Record Gyro", self)
+        self.gyroRecordButton.clicked.connect(self.startRecordingWristGyro)
+
+        # setup layout
         self.setupLayout()
 
     def process_events(self):
@@ -186,6 +197,9 @@ class GloveMonitorWindow(QMainWindow):
             # Add the Zero Gyro button below orientation
             self.layout.addWidget(self.gyroResetButton, 6, 0, 1, 3)
 
+            # Add the temporary record Gyro button below orientation
+            self.layout.addWidget(self.gyroRecordButton, 7, 0, 1, 3)
+
         else:
             # Show all labels for finger views
             self.dataLabel1.show()
@@ -206,6 +220,9 @@ class GloveMonitorWindow(QMainWindow):
 
             self.layout.addWidget(self.gyroResetButton, 6, 0, 1, 3)
 
+            # Add the temporary record Gyro button below orientation
+            self.layout.addWidget(self.gyroRecordButton, 7, 0, 1, 3)
+
     def changeView(self, viewName):
         self.currentView = viewName
         self.viewTitleLabel.setText(f'{viewName} Data')
@@ -224,9 +241,14 @@ class GloveMonitorWindow(QMainWindow):
             self.animationView.close()
         self.close()
 
+
     def zeroGyros(self):
         """Called when Zero Gyro button is clicked"""
         self.rightHand.zeroOrientation()
+
+        if self.recordWristGyro:
+            self.endWristGyro = True # temporary for recording wrist gyro data
+            print("recording ended")
         print("Gyroscope orientation zeroed")
 
     def updateData(self, data, timestamp):
@@ -362,6 +384,7 @@ class GloveMonitorWindow(QMainWindow):
 
             try:
                 self.rightHand.updateSampleRate(self.estimated_sample_rate)
+                self.recordGyroData(timestamp, float(dataArray[38]), float(dataArray[39]), float(dataArray[40])) # temporary for collecting wrist gyro data
                 self.rightHand.updateOrientation(float(dataArray[38]), float(dataArray[39]), float(dataArray[40]))
                 self.rightHand.updateOrientationFingers(float(dataArray[8]), float(dataArray[9]), float(dataArray[10]), # Thumb
                                                         float(dataArray[14]), float(dataArray[15]), float(dataArray[16]), # Pointer
@@ -460,7 +483,39 @@ class GloveMonitorWindow(QMainWindow):
             gyroN = self.rightHand.getOrientation()  # Returns [roll, pitch, yaw] in degrees
             self.dataLabel9.setText(
                 f'Wrist Orientation (deg):\n'
-                f'X = {format_value(gyroN[0])}\n'
+                f'X = {format_value(gyroN[0] - 90)}\n'
                 f'Y = {format_value(gyroN[1])}\n'
                 f'Z = {format_value(gyroN[2])}'
             )
+    def recordGyroData(self, timestamp, wristwX, wristwY, wristwZ): # temporary for recording wrist gyro data
+        marker = ""
+        record = self.recordWristGyro
+        if self.endWristGyro:
+            marker = "end"
+            self.recordWristGyro = False
+        elif self.beginWristGyro:
+            marker = "start"
+            self.recordWristGyro = True
+            record = True
+            self.session += 1
+        elif self.endWristGyro and self.beginWristGyro:
+            marker = "error - begin and end"
+            print("error - begin and end on Wrist Gyro Recording")
+        self.beginWristGyro = False
+        self.endWristGyro = False
+
+        if record:
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': wristwX, 'wy': wristwY, 'wz': wristwZ, 'marker': marker}
+            with open('wristGyro.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+        return
+
+    def startRecordingWristGyro(self): # temporary for recording wrist gyro data
+        if not self.recordWristGyro:
+            self.beginWristGyro = True
+            print("recording started")
+        else:
+            print("recording already in progress")
+        return
