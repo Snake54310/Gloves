@@ -1,5 +1,5 @@
 import math
-
+import numpy as np
 
 class Thumb:
     def __init__(self, segment1Length, segment2Length): # segments progressive from base
@@ -248,6 +248,14 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         self.pinkyGyroY = 0
         self.pinkyGyroZ = 0
 
+        self.A_opt = np.array([
+            [2.11682848e-07, -7.30882888e-08, -1.72638268e-07],
+            [2.72133473e-07, -9.91529253e-08, -1.43758629e-07],
+            [4.57493345e-09, -3.07972365e-07, -1.05372567e-09]
+        ])
+
+        self.b_opt = np.array([[-4.43482559e-09, -7.57192815e-09, -1.39796005e-08]])
+
     def setJ1Angles(self, thumbFlex, pointerFlex, middleFlex, ringFlex, pinkyFlex):
         self.thumb.setJ1Flex(thumbFlex)
         self.pointer.setJ1Flex(pointerFlex)
@@ -272,14 +280,22 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
     def updateSampleRate(self, newRate):
         self.sampleRate = newRate
         return
+
     def updateOrientation(self, wristGyroRadssX, wristGyroRadssY, wristGyroRadssZ):
-        # NOTE: SENSOR X_rotation on wrist is in -X direction in animation window (e.g. 340 degrees sensor => 20 degrees animation).
+        # Construct raw gyro vector
+        gyro_raw = np.array([wristGyroRadssX, wristGyroRadssY, wristGyroRadssZ])
+
+        # Apply calibration: corrected = raw - (A * raw + b)
+        gyro_corrected = gyro_raw - (self.A_opt @ gyro_raw + self.b_opt.flatten())
+
+        # NOTE: SENSOR X_rotation on wrist is in -X direction in animation window
         # NOTE: Sensor Y and Z rotations are swapped
         # NOTE: After swapping Sensor Y and Z with window Z and Y, Sensor data for Z in window is reversed (-Z direction)
 
-        self.wristGyroDegX = (self.wristGyroDegX - ((wristGyroRadssX / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.wristGyroDegY = (self.wristGyroDegY + ((wristGyroRadssZ / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.wristGyroDegZ = (self.wristGyroDegZ - ((wristGyroRadssY / self.sampleRate) * 180 / math.pi) + 360) % 360
+        self.wristGyroDegX = (self.wristGyroDegX - ((gyro_corrected[0] / self.sampleRate) * 180 / math.pi) + 360) % 360
+        self.wristGyroDegY = (self.wristGyroDegY + ((gyro_corrected[2] / self.sampleRate) * 180 / math.pi) + 360) % 360
+        self.wristGyroDegZ = (self.wristGyroDegZ - ((gyro_corrected[1] / self.sampleRate) * 180 / math.pi) + 360) % 360
+
         return
 
     def updateOrientationFingers(self, thumbX, thumbY, thumbZ, pointerX, pointerY, pointerZ,
