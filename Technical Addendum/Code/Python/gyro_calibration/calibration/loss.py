@@ -81,8 +81,8 @@ def total_loss_linear(params, episodes, lambda_A=1e-3, lambda_b=1e-4):
     drift_loss = 0.0
     for ep in episodes:
         theta = integrate_episode(ep, A, b)
-        # drift_loss += np.sum(theta ** 2)
-        drift_loss += np.linalg.norm(theta)
+        drift_loss += np.sum(theta ** 2)
+        # drift_loss += np.linalg.norm(theta)
     drift_loss /= N
 
 
@@ -133,8 +133,8 @@ def total_loss_quadratic(params, episodes, lambda_A=1e-3, lambda_b=1e-4, lambda_
     drift_loss = 0.0
     for ep in episodes:
         theta = integrate_episode(ep, A, b, B)
-        # drift_loss += np.sum(theta ** 2)
-        drift_loss += np.linalg.norm(theta)
+        drift_loss += np.sum(theta ** 2)
+        # drift_loss += np.linalg.norm(theta)
     drift_loss /= N
 
     # LASSO regularization — B penalised more than A

@@ -57,18 +57,18 @@ def main():
         return
 
     # 2) Train/test split
-    train_eps, test_eps = train_test_split(episodes, test_size=0.3, random_state=42)
+    train_eps, test_eps = train_test_split(episodes, test_size=0.1, random_state=42)
     print(f"Total: {len(episodes)}  Train: {len(train_eps)}  Test: {len(test_eps)}")
 
     # 3) Fit linear model
     # Tune lambda_A and lambda_b if needed:
     #   - increase lambda_A if A drifts far from identity
     #   - decrease lambda_A if drift correction is too weak
-    A_lin, b_lin = train_linear(train_eps, lambda_A=1e-3, lambda_b=1e-4)
+    A_lin, b_lin = train_linear(train_eps, lambda_A=1.5e-3, lambda_b=1e-5)
 
     # 4) Fit quadratic model — uses same data, no re-collection needed
     # lambda_B > lambda_A so B only grows if it genuinely helps
-    A_quad, b_quad, B_quad = train_quadratic(train_eps, lambda_A=1e-3, lambda_b=1e-4, lambda_B=1e-2)
+    A_quad, b_quad, B_quad = train_quadratic(train_eps, lambda_A=1e-4, lambda_b=1e-5, lambda_B=1e-3)
 
     # 5) Summary statistics on test set
     raw_norm  = mean_drift_norm(test_eps, A_RAW, b_RAW)
