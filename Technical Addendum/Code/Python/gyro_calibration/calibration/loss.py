@@ -93,4 +93,13 @@ def total_loss_quadratic(params, episodes):
     for ep in episodes:
         theta = integrate_episode(ep, A, b, B)
         loss += np.sum(theta ** 2)
+
+    # Penalise large A and B — keeps them near zero, forcing b to
+    # handle bulk correction while A and B only model rate-dependent drift
+    lambda_A = 1e-3
+    lambda_B = 1e-3
+
+    loss += lambda_A * np.sum(A ** 2)
+    loss += lambda_B * np.sum(B ** 2)
+
     return loss
