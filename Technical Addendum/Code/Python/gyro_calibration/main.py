@@ -64,11 +64,11 @@ def main():
     # Tune lambda_A and lambda_b if needed:
     #   - increase lambda_A if A drifts far from identity
     #   - decrease lambda_A if drift correction is too weak
-    A_lin, b_lin = train_linear(train_eps, lambda_A=5e-2, lambda_b=1e-4)
+    A_lin, b_lin = train_linear(train_eps, lambda_A=6e-2, lambda_b=1e-4)
 
     # 4) Fit quadratic model — uses same data, no re-collection needed
     # lambda_B > lambda_A so B only grows if it genuinely helps
-    A_quad, b_quad, B_quad = train_quadratic(train_eps, lambda_A=5e-2, lambda_b=1e-4, lambda_B=1e-2)
+    A_quad, b_quad, B_quad = train_quadratic(train_eps, lambda_A=6e-2, lambda_b=1e-4, lambda_B=1e-3)
 
     # 5) Summary statistics on test set
     raw_norm  = mean_drift_norm(test_eps, A_RAW, b_RAW)
