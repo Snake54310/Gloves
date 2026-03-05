@@ -1,105 +1,145 @@
 import numpy as np
-from gyro_calibration.calibration.models import apply_transform
 
 
 def integrate_episode(ep, A, b, B=None):
     """
-    Integrate corrected angular velocity over one episode.
+    Apply correction and integrate one episode using the trapezoidal rule.
 
-    Correction model: w_corrected = w_raw - apply_transform(w_raw, A, b, B)
-    Integration:      theta = sum(w_corrected * dt)
+    Correction model:
+        Linear:    w_corr = A @ w + b
+        Quadratic: w_corr = A @ w + B @ w² + b
+
+    Since every episode is a guaranteed closed-orientation loop
+    (glove is zeroed at start and end), the true integral is zero.
+    Any residual is drift.
 
     Parameters
     ----------
     ep : pd.DataFrame
-        Episode dataframe with columns: timestamp, wx, wy, wz.
+        Episode with columns: timestamp, wx, wy, wz.
     A : np.ndarray, shape (3, 3)
-        Linear correction matrix.
-    b : np.ndarray, shape (1, 3) or (3,)
-        Bias vector.
+    b : np.ndarray, shape (3,)
     B : np.ndarray, shape (3, 3), optional
-        Quadratic correction matrix.
 
     Returns
     -------
     np.ndarray, shape (3,)
-        Integrated angle vector (rad).
+        Net integrated angle [theta_x, theta_y, theta_z] in radians.
     """
     t = ep['timestamp'].values
-    omega = ep[['wx', 'wy', 'wz']].values
+    omega = ep[['wx', 'wy', 'wz']].values  # shape (N, 3)
+    dt = np.diff(t)                         # shape (N-1,)
 
-    dt = np.diff(t)             # shape (N-1,)
-    omega = omega[:-1]          # align samples with dt intervals
+    # Apply correction to every sample: w_corr = A @ w + b (+ B @ w² if quadratic)
+    w_corr = (omega @ A.T) + b              # shape (N, 3)
+    if B is not None:
+        w_corr = w_corr + (omega ** 2) @ B.T
 
-    # Subtract predicted offset (correction model: w_corr = w_raw - offset)
-    offset = apply_transform(omega, A, b, B)
-    w_corrected = omega - offset
-
-    theta = np.sum(w_corrected * dt[:, None], axis=0)
+    # Trapezoidal integration: 0.5 * (w[k] + w[k+1]) * dt
+    theta = np.sum(0.5 * (w_corr[:-1] + w_corr[1:]) * dt[:, None], axis=0)
     return theta
 
 
-def total_loss(params, episodes):
+def count_points(episodes):
+    """Total number of samples across all episodes — used to scale loss."""
+    return sum(len(ep) for ep in episodes)
+
+
+def total_loss_linear(params, episodes, lambda_A=1e-3, lambda_b=1e-4):
     """
-    Loss for the linear calibration model: minimise sum of squared integrated drift.
+    Loss for linear model: w_corr = A @ w + b
+
+    Loss = (1/N) * Σ_episodes ||∫w_corr dt||²
+         + lambda_A * ||A - I||₁        (LASSO on deviation of A from identity)
+         + lambda_b * ||b||₁            (LASSO on bias)
+
+    Scaling by N (total points) makes lambda values dataset-size independent.
+    Penalising ||A - I|| rather than ||A|| keeps A near identity,
+    preventing the degenerate A→0 solution.
 
     Parameters
     ----------
     params : np.ndarray, shape (12,)
-        Flat array [A (9), b (3)].
+        [A (9, row-major), b (3)]
     episodes : list of pd.DataFrame
-        Training episodes.
+    lambda_A : float
+        LASSO penalty weight for A deviation from identity.
+    lambda_b : float
+        LASSO penalty weight for bias b.
 
     Returns
     -------
     float
-        Total squared integrated drift across all episodes.
     """
     A = params[:9].reshape(3, 3)
-    b = params[9:].reshape(1, 3)
+    b = params[9:12]
 
-    total = 0.0
+    N = count_points(episodes)
+
+    # Drift loss — scaled by total number of points
+
+    drift_loss = 0.0
     for ep in episodes:
         theta = integrate_episode(ep, A, b)
-        total += np.sum(theta ** 2)
-    return total
+        # drift_loss += np.sum(theta ** 2)
+        drift_loss += np.linalg.norm(theta)
+    drift_loss /= N
 
 
-def total_loss_quadratic(params, episodes):
+    # LASSO regularization
+    # Penalise A deviating from identity (not A itself — keeps scale near 1)
+    reg_A = lambda_A * np.sum(np.abs(A - np.eye(3)))
+    reg_b = lambda_b * np.sum(np.abs(b))
+
+    return drift_loss + reg_A + reg_b
+
+
+def total_loss_quadratic(params, episodes, lambda_A=1e-3, lambda_b=1e-4, lambda_B=1e-2):
     """
-    Loss for the quadratic calibration model: minimise sum of squared integrated drift.
+    Loss for quadratic model: w_corr = A @ w + B @ w² + b
 
-    Correction model: offset = w @ A.T + w^2 @ B.T + b
-                      w_corr  = w_raw - offset
-    Loss:             sum over episodes of ||integral(w_corr dt)||^2
+    Loss = (1/N) * Σ_episodes ||∫w_corr dt||²
+         + lambda_A * ||A - I||₁     (LASSO on A deviation from identity)
+         + lambda_b * ||b||₁         (LASSO on bias)
+         + lambda_B * ||B||₁         (LASSO on B — penalised more than A)
+
+    B is penalised more heavily than A (lambda_B > lambda_A) because
+    the quadratic term should only activate when linear correction is
+    genuinely insufficient — it has more capacity to overfit.
 
     Parameters
     ----------
     params : np.ndarray, shape (21,)
-        Flat array [A (9), B (9), b (3)].
+        [A (9, row-major), b (3), B (9, row-major)]
     episodes : list of pd.DataFrame
-        Training episodes.
+    lambda_A : float
+        LASSO penalty weight for A deviation from identity.
+    lambda_b : float
+        LASSO penalty weight for bias b.
+    lambda_B : float
+        LASSO penalty weight for B (higher-order, penalised more).
 
     Returns
     -------
     float
-        Total squared integrated drift across all episodes.
     """
     A = params[:9].reshape(3, 3)
-    B = params[9:18].reshape(3, 3)
-    b = params[18:].reshape(1, 3)
+    b = params[9:12]
+    B = params[12:21].reshape(3, 3)
 
-    loss = 0.0
+    N = count_points(episodes)
+
+    # Drift loss — scaled by total number of points
+    drift_loss = 0.0
     for ep in episodes:
         theta = integrate_episode(ep, A, b, B)
-        loss += np.sum(theta ** 2)
+        # drift_loss += np.sum(theta ** 2)
+        drift_loss += np.linalg.norm(theta)
+    drift_loss /= N
 
-    # Penalise large A and B — keeps them near zero, forcing b to
-    # handle bulk correction while A and B only model rate-dependent drift
-    lambda_A = 1e-3
-    lambda_B = 1e-3
+    # LASSO regularization — B penalised more than A
+    reg_A = lambda_A * np.sum(np.abs(A - np.eye(3)))
+    reg_b = lambda_b * np.sum(np.abs(b))
+    reg_B = lambda_B * np.sum(np.abs(B))  # higher penalty for quadratic term
 
-    loss += lambda_A * np.sum(A ** 2)
-    loss += lambda_B * np.sum(B ** 2)
-
-    return loss
+    return drift_loss + reg_A + reg_b + reg_B
