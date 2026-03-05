@@ -17,11 +17,8 @@ def apply_correction(omega, A, b, B=None):
     omega : np.ndarray, shape (3,)
         Raw angular velocity [wx, wy, wz] in rad/s.
     A : np.ndarray, shape (3, 3)
-        Linear correction matrix.
     b : np.ndarray, shape (3,)
-        Bias vector.
     B : np.ndarray, shape (3, 3), optional
-        Quadratic correction matrix.
 
     Returns
     -------

@@ -1,7 +1,7 @@
 import numpy as np
 from gyro_calibration.calibration.loss import integrate_episode
 
-# Raw baseline: A=I, b=0, B=None — signal passes through untouched
+# Raw baseline: A=I, b=0 — signal passes through untouched
 A_RAW = np.eye(3)
 b_RAW = np.zeros(3)
 

@@ -131,6 +131,8 @@ class GloveMonitorWindow(QMainWindow):
         self.gyroRecordButton = QPushButton("Record Gyro", self)
         self.gyroRecordButton.clicked.connect(self.startRecordingWristGyro)
 
+        self.startedRecording = False
+
         # setup layout
         self.setupLayout()
 
@@ -489,30 +491,43 @@ class GloveMonitorWindow(QMainWindow):
             )
     def recordGyroData(self, timestamp, wristwX, wristwY, wristwZ): # temporary for recording wrist gyro data
         marker = ""
+        marker2 = ""
         record = self.recordWristGyro
         if self.endWristGyro:
             marker = "end"
+            marker2 = "start"
             self.recordWristGyro = False
         elif self.beginWristGyro:
             marker = "start"
+            marker2 = "end"
             self.recordWristGyro = True
             record = True
             self.session += 1
         elif self.endWristGyro and self.beginWristGyro:
             marker = "error - begin and end"
+            marker2 = "error - begin and end"
             print("error - begin and end on Wrist Gyro Recording")
-        self.beginWristGyro = False
-        self.endWristGyro = False
 
         if record:
             fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
             new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': wristwX, 'wy': wristwY, 'wz': wristwZ, 'marker': marker}
-            with open('wristGyro.csv', 'a', newline='') as f:
+            with open('gyro_log.csv', 'a', newline='') as f:
                 writer = DictWriter(f, fieldnames=fields)
                 writer.writerow(new_row)
+        if ((not record) or (self.beginWristGyro) or (self.endWristGyro)) and self.startedRecording:
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': wristwX, 'wy': wristwY, 'wz': wristwZ,
+                       'marker': marker2}
+            with open('gyro_stationary.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+        self.beginWristGyro = False
+        self.endWristGyro = False
         return
 
     def startRecordingWristGyro(self): # temporary for recording wrist gyro data
+        self.startedRecording = True
         if not self.recordWristGyro:
             self.beginWristGyro = True
             print("recording started")

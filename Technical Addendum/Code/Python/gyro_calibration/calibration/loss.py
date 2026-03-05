@@ -1,6 +1,26 @@
 import numpy as np
 
 
+def smooth_l1(x, epsilon=1e-4):
+    """
+    Smooth L1 (pseudo-Huber) norm — differentiable everywhere.
+
+    Approximates L1 (||x||₁) but with a smooth transition near zero,
+    giving L-BFGS-B a valid gradient throughout optimisation.
+
+    Parameters
+    ----------
+    x : np.ndarray
+    epsilon : float
+        Smoothing parameter. Smaller = closer to true L1.
+
+    Returns
+    -------
+    float
+    """
+    return np.sum(np.sqrt(x ** 2 + epsilon) - np.sqrt(epsilon))
+
+
 def integrate_episode(ep, A, b, B=None):
     """
     Apply correction and integrate one episode using the trapezoidal rule.
@@ -30,8 +50,8 @@ def integrate_episode(ep, A, b, B=None):
     omega = ep[['wx', 'wy', 'wz']].values  # shape (N, 3)
     dt = np.diff(t)                         # shape (N-1,)
 
-    # Apply correction to every sample: w_corr = A @ w + b (+ B @ w² if quadratic)
-    w_corr = (omega @ A.T) + b              # shape (N, 3)
+    # Apply correction: w_corr = A @ w + b (+ B @ w² if quadratic)
+    w_corr = (omega @ A.T) + b
     if B is not None:
         w_corr = w_corr + (omega ** 2) @ B.T
 
@@ -45,17 +65,41 @@ def count_points(episodes):
     return sum(len(ep) for ep in episodes)
 
 
+def total_loss_bias_only(b, episodes):
+    """
+    Loss for bias-only model: w_corr = I @ w + b = w + b
+    A is fixed to identity. Used in stage 1 of two-stage training.
+
+    Parameters
+    ----------
+    b : np.ndarray, shape (3,)
+    episodes : list of pd.DataFrame
+
+    Returns
+    -------
+    float
+    """
+    A = np.eye(3)
+    N = count_points(episodes)
+
+    drift_loss = 0.0
+    for ep in episodes:
+        theta = integrate_episode(ep, A, b)
+        drift_loss += np.sum(theta ** 2)
+    return drift_loss / N
+
+
 def total_loss_linear(params, episodes, lambda_A=1e-3, lambda_b=1e-4):
     """
     Loss for linear model: w_corr = A @ w + b
 
     Loss = (1/N) * Σ_episodes ||∫w_corr dt||²
-         + lambda_A * ||A - I||₁        (LASSO on deviation of A from identity)
-         + lambda_b * ||b||₁            (LASSO on bias)
+         + lambda_A * smooth_l1(A - I)
+         + lambda_b * smooth_l1(b)
 
-    Scaling by N (total points) makes lambda values dataset-size independent.
-    Penalising ||A - I|| rather than ||A|| keeps A near identity,
-    preventing the degenerate A→0 solution.
+    Penalises A deviating from identity (not A itself), so scale
+    stays near 1 and the degenerate A→0 solution is prevented.
+    Scaled by N so lambda values are dataset-size independent.
 
     Parameters
     ----------
@@ -63,9 +107,7 @@ def total_loss_linear(params, episodes, lambda_A=1e-3, lambda_b=1e-4):
         [A (9, row-major), b (3)]
     episodes : list of pd.DataFrame
     lambda_A : float
-        LASSO penalty weight for A deviation from identity.
     lambda_b : float
-        LASSO penalty weight for bias b.
 
     Returns
     -------
@@ -73,23 +115,18 @@ def total_loss_linear(params, episodes, lambda_A=1e-3, lambda_b=1e-4):
     """
     A = params[:9].reshape(3, 3)
     b = params[9:12]
-
     N = count_points(episodes)
 
-    # Drift loss — scaled by total number of points
-
     drift_loss = 0.0
+    # In total_loss_linear and total_loss_quadratic:
     for ep in episodes:
+        T = ep['timestamp'].iloc[-1] - ep['timestamp'].iloc[0]
         theta = integrate_episode(ep, A, b)
-        drift_loss += np.sum(theta ** 2)
-        # drift_loss += np.linalg.norm(theta)
-    drift_loss /= N
+        drift_loss += np.sum((theta / T) ** 2)  # normalize by duration
+    #drift_loss /= N
 
-
-    # LASSO regularization
-    # Penalise A deviating from identity (not A itself — keeps scale near 1)
-    reg_A = lambda_A * np.sum(np.abs(A - np.eye(3)))
-    reg_b = lambda_b * np.sum(np.abs(b))
+    reg_A = lambda_A * smooth_l1(A - np.eye(3))
+    reg_b = lambda_b * smooth_l1(b)
 
     return drift_loss + reg_A + reg_b
 
@@ -98,14 +135,8 @@ def total_loss_quadratic(params, episodes, lambda_A=1e-3, lambda_b=1e-4, lambda_
     """
     Loss for quadratic model: w_corr = A @ w + B @ w² + b
 
-    Loss = (1/N) * Σ_episodes ||∫w_corr dt||²
-         + lambda_A * ||A - I||₁     (LASSO on A deviation from identity)
-         + lambda_b * ||b||₁         (LASSO on bias)
-         + lambda_B * ||B||₁         (LASSO on B — penalised more than A)
-
-    B is penalised more heavily than A (lambda_B > lambda_A) because
-    the quadratic term should only activate when linear correction is
-    genuinely insufficient — it has more capacity to overfit.
+    B is penalised more heavily than A so it only activates when the
+    linear term is genuinely insufficient.
 
     Parameters
     ----------
@@ -113,11 +144,9 @@ def total_loss_quadratic(params, episodes, lambda_A=1e-3, lambda_b=1e-4, lambda_
         [A (9, row-major), b (3), B (9, row-major)]
     episodes : list of pd.DataFrame
     lambda_A : float
-        LASSO penalty weight for A deviation from identity.
     lambda_b : float
-        LASSO penalty weight for bias b.
     lambda_B : float
-        LASSO penalty weight for B (higher-order, penalised more).
+        Higher-order penalty — should be larger than lambda_A.
 
     Returns
     -------
@@ -126,20 +155,18 @@ def total_loss_quadratic(params, episodes, lambda_A=1e-3, lambda_b=1e-4, lambda_
     A = params[:9].reshape(3, 3)
     b = params[9:12]
     B = params[12:21].reshape(3, 3)
-
     N = count_points(episodes)
 
-    # Drift loss — scaled by total number of points
     drift_loss = 0.0
+    # In total_loss_linear and total_loss_quadratic:
     for ep in episodes:
+        T = ep['timestamp'].iloc[-1] - ep['timestamp'].iloc[0]
         theta = integrate_episode(ep, A, b, B)
-        drift_loss += np.sum(theta ** 2)
-        # drift_loss += np.linalg.norm(theta)
-    drift_loss /= N
+        drift_loss += np.sum((theta / T) ** 2)  # normalize by duration
+    #drift_loss /= N
 
-    # LASSO regularization — B penalised more than A
-    reg_A = lambda_A * np.sum(np.abs(A - np.eye(3)))
-    reg_b = lambda_b * np.sum(np.abs(b))
-    reg_B = lambda_B * np.sum(np.abs(B))  # higher penalty for quadratic term
+    reg_A = lambda_A * smooth_l1(A - np.eye(3))
+    reg_b = lambda_b * smooth_l1(b)
+    reg_B = lambda_B * smooth_l1(B)  # higher penalty for quadratic term
 
     return drift_loss + reg_A + reg_b + reg_B
