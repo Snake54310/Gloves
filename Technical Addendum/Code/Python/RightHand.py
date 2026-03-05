@@ -248,11 +248,13 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         self.pinkyGyroY = 0
         self.pinkyGyroZ = 0
 
-        self.A_opt = np.array([
-            [2.11682848e-07, -7.30882888e-08, -1.72638268e-07],
-            [2.72133473e-07, -9.91529253e-08, -1.43758629e-07],
-            [4.57493345e-09, -3.07972365e-07, -1.05372567e-09]
-        ])
+        self.A_opt = np.array( [[ 1.00000079e+00, -6.18888135e-07, -5.58420183e-07],
+            [-4.28651060e-08, 1.00000217e+00, 3.48483226e-07],
+            [-1.67358906e-07, -1.23774813e-07, 1.00000032e+00]])
+
+        self.B_opt =  np.array( [[-2.31986984e-09, -5.10725126e-08, -3.00248775e-08],
+            [-1.10692024e-07, 4.61388377e-08, 1.72258647e-07],
+            [ 1.15692980e-07, -1.46480205e-08, -3.75144996e-08]])
 
         self.b_opt = np.array([[-4.43482559e-09, -7.57192815e-09, -1.39796005e-08]])
 
@@ -285,8 +287,12 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         # Construct raw gyro vector
         gyro_raw = np.array([wristGyroRadssX, wristGyroRadssY, wristGyroRadssZ])
 
-        # Apply calibration: corrected = raw - (A * raw + b)
-        gyro_corrected = gyro_raw - (self.A_opt @ gyro_raw + self.b_opt.flatten())
+        # Apply quadratic calibration: corrected = raw - (A @ raw + B @ raw² + b)
+        gyro_corrected = gyro_raw - (
+                self.A_opt @ gyro_raw
+                + self.B_opt @ (gyro_raw ** 2)
+                + self.b_opt.flatten()
+        )
 
         # NOTE: SENSOR X_rotation on wrist is in -X direction in animation window
         # NOTE: Sensor Y and Z rotations are swapped
