@@ -248,15 +248,15 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         self.pinkyGyroY = 0
         self.pinkyGyroZ = 0
 
-        self.A_opt = np.array([[ 9.88835866e-01, -1.02170048e-03, -1.81326016e-03],
-            [-1.02091013e-03, 9.92668275e-01, -4.78283324e-04],
-            [-1.81383938e-03, -4.83424975e-04,  9.90233499e-01]])
+        self.A_opt = np.array([[ 9.97852270e-01, -1.82061886e-04,  6.01801212e-04],
+             [-9.57230102e-05,  9.97542614e-01, -1.85327086e-04],
+             [ 6.06436393e-04, -2.26345333e-04,  9.97718588e-01]])
 
-        self.B_opt =  np.array([[-0.03238601, -0.01911224, 0.01175069],
-            [-0.01434345, 0.00388381, 0.05200441],
-            [ 0.03202885, -0.01127119, 0.0286553]])
+        self.B_opt =  np.array([[-0.00105965, -0.00752463,  0.04822147],
+             [ 0.00484731, 0.0059687, 0.04093963],
+             [ 0.0411502, -0.03935278, -0.0012115 ]])
 
-        self.b_opt = np.array([-9.27758401e-03, 9.77977473e-05, -4.49492911e-03])
+        self.b_opt = np.array([-0.01106485, -0.00100655, -0.00118413])
 
     def setJ1Angles(self, thumbFlex, pointerFlex, middleFlex, ringFlex, pinkyFlex):
         self.thumb.setJ1Flex(thumbFlex)

@@ -1,14 +1,14 @@
 import numpy as np
 from scipy.optimize import minimize
 from gyro_calibration.calibration.loss import (
-    total_loss_bias_only,
-    total_loss_linear,
-    total_loss_quadratic,
+    loss_bias_from_stationary,
+    loss_trajectory_linear,
+    loss_trajectory_quadratic,
 )
 
 
 def _run_minimize(loss_fn, params0, args, label):
-    """Helper to run L-BFGS-B and print convergence info."""
+    """Helper: run L-BFGS-B and report convergence."""
     result = minimize(
         loss_fn,
         params0,
@@ -24,112 +24,106 @@ def _run_minimize(loss_fn, params0, args, label):
     return result.x
 
 
-def train_linear(episodes, lambda_A=1e-3, lambda_b=1e-4):
+def fit_bias(stationary_episodes):
     """
-    Fit linear correction model: w_corr = A @ w + b
+    Phase 1 — fit bias b from stationary recordings only.
 
-    Two-stage training:
-        Stage 1 — fit b only with A fixed to identity.
-                   b is a constant offset and cannot hurt test episodes
-                   the way A can. Starting here anchors the solution
-                   in a physically safe region.
-        Stage 2 — fit A and b jointly from the stage 1 result.
-                   A can now only improve on what b already achieves,
-                   rather than absorbing corrections b should handle.
+    When the glove is completely still, true angular velocity is zero.
+    Any nonzero reading is pure sensor bias. This gives a physically
+    grounded b that generalises across all trajectory episodes.
 
     Parameters
     ----------
-    episodes : list of pd.DataFrame
+    stationary_episodes : list of pd.DataFrame
+        Episodes recorded with glove completely still.
+
+    Returns
+    -------
+    b : np.ndarray, shape (3,)
+    """
+    print("\n=== PHASE 1 — Fit bias from stationary data ===")
+    b0 = np.zeros(3)
+    b_opt = _run_minimize(
+        loss_bias_from_stationary,
+        b0,
+        args=(stationary_episodes,),
+        label="Phase 1 (bias)",
+    )
+    print(f"  b: {b_opt}")
+    return b_opt
+
+
+def train_linear(trajectory_episodes, b_fixed, lambda_A=1e-3):
+    """
+    Phase 2 — fit linear correction A with b fixed from phase 1.
+
+    b is never refitted here — it comes solely from stationary data.
+    Only A is free, initialised to identity (no initial correction).
+
+    Parameters
+    ----------
+    trajectory_episodes : list of pd.DataFrame
+    b_fixed : np.ndarray, shape (3,)
+        Bias fixed from fit_bias(). Never modified here.
     lambda_A : float
-        Smooth-L1 penalty on A deviating from identity.
-    lambda_b : float
-        Smooth-L1 penalty on bias magnitude.
 
     Returns
     -------
     A : np.ndarray, shape (3, 3)
-    b : np.ndarray, shape (3,)
+    b : np.ndarray, shape (3,)  — same as b_fixed
     """
-    print("\n=== LINEAR MODEL — Stage 1: bias only (A=I fixed) ===")
-    b0 = np.zeros(3)
-    b_stage1 = _run_minimize(
-        total_loss_bias_only,
-        b0,
-        args=(episodes,),
-        label="Stage 1",
-    )
-    print(f"  b (stage 1): {b_stage1}")
-
-    print("\n=== LINEAR MODEL — Stage 2: joint A + b ===")
+    print("\n=== LINEAR MODEL (A only, b fixed from stationary) ===")
     A0 = np.eye(3).flatten()
-    params0 = np.concatenate([A0, b_stage1])  # warm-start b from stage 1
     params_opt = _run_minimize(
-        total_loss_linear,
-        params0,
-        args=(episodes, lambda_A, lambda_b),
-        label="Stage 2",
+        loss_trajectory_linear,
+        A0,
+        args=(trajectory_episodes, b_fixed, lambda_A),
+        label="Linear",
     )
 
     A = params_opt[:9].reshape(3, 3)
-    b = params_opt[9:12]
-
     print(f"  A:\n{A}")
-    print(f"  b: {b}")
+    print(f"  b (fixed): {b_fixed}")
+    return A, b_fixed
 
-    return A, b
 
-
-def train_quadratic(episodes, lambda_A=1e-1, lambda_b=1e-4, lambda_B=1e-2):
+def train_quadratic(trajectory_episodes, b_fixed, lambda_A=1e-3, lambda_B=1e-2):
     """
-    Fit quadratic correction model: w_corr = A @ w + B @ w² + b
+    Phase 2 — fit quadratic correction A and B with b fixed from phase 1.
 
-    Two-stage training:
-        Stage 1 — fit b only (A=I, B=0 fixed).
-        Stage 2 — fit A, b, and B jointly from stage 1 result.
-                   B is initialised to zero and penalised more heavily
-                   than A, so it only grows if genuinely needed.
+    b is never refitted here — it comes solely from stationary data.
+    A is initialised to identity, B is initialised to zero.
+    B is penalised more heavily than A so it only grows if it
+    genuinely reduces drift beyond what A alone achieves.
 
     Parameters
     ----------
-    episodes : list of pd.DataFrame
+    trajectory_episodes : list of pd.DataFrame
+    b_fixed : np.ndarray, shape (3,)
+        Bias fixed from fit_bias(). Never modified here.
     lambda_A : float
-    lambda_b : float
     lambda_B : float
-        Higher-order penalty — should be larger than lambda_A.
 
     Returns
     -------
     A : np.ndarray, shape (3, 3)
-    b : np.ndarray, shape (3,)
+    b : np.ndarray, shape (3,)  — same as b_fixed
     B : np.ndarray, shape (3, 3)
     """
-    print("\n=== QUADRATIC MODEL — Stage 1: bias only (A=I, B=0 fixed) ===")
-    b0 = np.zeros(3)
-    b_stage1 = _run_minimize(
-        total_loss_bias_only,
-        b0,
-        args=(episodes,),
-        label="Stage 1",
-    )
-    print(f"  b (stage 1): {b_stage1}")
-
-    print("\n=== QUADRATIC MODEL — Stage 2: joint A + b + B ===")
+    print("\n=== QUADRATIC MODEL (A + B, b fixed from stationary) ===")
     A0 = np.eye(3).flatten()
     B0 = np.zeros(9)
-    params0 = np.concatenate([A0, b_stage1, B0])  # warm-start b from stage 1
+    params0 = np.concatenate([A0, B0])
     params_opt = _run_minimize(
-        total_loss_quadratic,
+        loss_trajectory_quadratic,
         params0,
-        args=(episodes, lambda_A, lambda_b, lambda_B),
-        label="Stage 2",
+        args=(trajectory_episodes, b_fixed, lambda_A, lambda_B),
+        label="Quadratic",
     )
 
     A = params_opt[:9].reshape(3, 3)
-    b = params_opt[9:12]
-    B = params_opt[12:21].reshape(3, 3)
-
+    B = params_opt[9:18].reshape(3, 3)
     print(f"  A:\n{A}")
-    print(f"  b: {b}")
+    print(f"  b (fixed): {b_fixed}")
     print(f"  B:\n{B}")
-
-    return A, b, B
+    return A, b_fixed, B

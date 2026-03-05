@@ -1,11 +1,22 @@
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from gyro_calibration.calibration.train import train_linear, train_quadratic
+from sklearn.model_selection import KFold
+from gyro_calibration.calibration.train import fit_bias, train_linear, train_quadratic
 from gyro_calibration.calibration.loss import integrate_episode
 from gyro_calibration.calibration.evaluate import evaluate, A_RAW, b_RAW
 
-CSV_PATH = "gyro_calibration/data/raw/gyro_log.csv"
+# ── File paths ────────────────────────────────────────────────────────────────
+# Stationary CSV: glove sitting completely still, multiple episodes.
+# Trajectory CSV: glove performing arbitrary closed-loop motions.
+# These can be the same file if you used the same marker scheme for both,
+# or separate files if you prefer to keep them distinct.
+STATIONARY_CSV  = "gyro_calibration/data/raw/gyro_stationary.csv"
+TRAJECTORY_CSV  = "gyro_calibration/data/raw/gyro_log.csv"
+
+# ── Hyperparameters ───────────────────────────────────────────────────────────
+LAMBDA_A = 8e-4 # 8e-5   # penalty on A deviating from identity
+LAMBDA_B = 5e-5 # 1e-5 # 1e-5   # penalty on B (higher-order, more conservative)
+N_FOLDS  = 5      # K-fold splits for trajectory CV
 
 
 def load_and_clean_csv(path):
@@ -25,7 +36,6 @@ def extract_episodes(df):
     """Sequential scan: open on 'start', close on next 'end'."""
     episodes = []
     current_start = None
-
     for idx, row in df.reset_index(drop=True).iterrows():
         mark = str(row.get("marker", "")).strip().lower()
         if mark == "start":
@@ -35,8 +45,7 @@ def extract_episodes(df):
             if len(ep) >= 2 and ep["timestamp"].iloc[-1] > ep["timestamp"].iloc[0]:
                 episodes.append(ep)
             current_start = None
-
-    print(f"Extracted episodes: {len(episodes)}")
+    print(f"  Extracted episodes: {len(episodes)}")
     return episodes
 
 
@@ -47,54 +56,132 @@ def mean_drift_norm(episodes, A, b, B=None):
     ])
 
 
-def main():
-    # 1) Load and extract episodes
-    df = load_and_clean_csv(CSV_PATH)
-    episodes = extract_episodes(df)
+def run_kfold(trajectory_episodes, b_fixed, model='linear'):
+    """
+    K-fold cross-validation over trajectory episodes.
+    b is always fixed from phase 1 — never refitted per fold.
+    """
+    episodes = list(trajectory_episodes)
+    kf = KFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
+    indices = np.arange(len(episodes))
 
-    if len(episodes) < 4:
-        print("Warning: very few episodes found. Check markers/timestamps.")
+    fold_raw  = []
+    fold_corr = []
+
+    print(f"\n{'='*55}")
+    print(f"K-FOLD ({N_FOLDS} folds) — {model.upper()} MODEL")
+    print(f"{'='*55}")
+
+    for fold, (train_idx, test_idx) in enumerate(kf.split(indices)):
+        train_eps = [episodes[i] for i in train_idx]
+        test_eps  = [episodes[i] for i in test_idx]
+
+        print(f"\n--- Fold {fold + 1}/{N_FOLDS}  "
+              f"(train: {len(train_eps)}, test: {len(test_eps)}) ---")
+
+        if model == 'linear':
+            A, b = train_linear(train_eps, b_fixed, LAMBDA_A)
+            B = None
+        else:
+            A, b, B = train_quadratic(train_eps, b_fixed, LAMBDA_A, LAMBDA_B)
+
+        raw_norm  = mean_drift_norm(test_eps, A_RAW, b_RAW)
+        corr_norm = mean_drift_norm(test_eps, A, b, B=B)
+        reduction = 1.0 - corr_norm / raw_norm if raw_norm > 0 else 0.0
+
+        print(f"  Fold {fold + 1}: raw={raw_norm:.6f} rad  "
+              f"corrected={corr_norm:.6f} rad  "
+              f"reduction={reduction:.2%}")
+
+        fold_raw.append(raw_norm)
+        fold_corr.append(corr_norm)
+
+    fold_raw  = np.array(fold_raw)
+    fold_corr = np.array(fold_corr)
+    reductions = 1.0 - fold_corr / fold_raw
+
+    print(f"\n  Mean raw:        {fold_raw.mean():.6f} rad")
+    print(f"  Mean corrected:  {fold_corr.mean():.6f} rad")
+    print(f"  Mean reduction:  {reductions.mean():.2%}  "
+          f"(std: {reductions.std():.2%}, min: {reductions.min():.2%})")
+
+    return {'fold_raw': fold_raw, 'fold_corr': fold_corr, 'reductions': reductions}
+
+
+def main():
+    # ── Phase 1: fit b from stationary data ──────────────────────────────────
+    print("Loading stationary data...")
+    df_stat = load_and_clean_csv(STATIONARY_CSV)
+    stationary_episodes = extract_episodes(df_stat)
+
+    if len(stationary_episodes) < 1:
+        print("ERROR: No stationary episodes found. "
+              "Record the glove sitting still with start/end markers.")
         return
 
-    # 2) Train/test split
-    train_eps, test_eps = train_test_split(episodes, test_size=0.1, random_state=42)
-    print(f"Total: {len(episodes)}  Train: {len(train_eps)}  Test: {len(test_eps)}")
+    b_fixed = fit_bias(stationary_episodes)
 
-    # 3) Fit linear model
-    # Tune lambda_A and lambda_b if needed:
-    #   - increase lambda_A if A drifts far from identity
-    #   - decrease lambda_A if drift correction is too weak
-    A_lin, b_lin = train_linear(train_eps, lambda_A=6e-2, lambda_b=1e-4)
+    # ── Phase 2: fit A (and B) from trajectory data ───────────────────────────
+    print("\nLoading trajectory data...")
+    df_traj = load_and_clean_csv(TRAJECTORY_CSV)
+    trajectory_episodes = extract_episodes(df_traj)
 
-    # 4) Fit quadratic model — uses same data, no re-collection needed
-    # lambda_B > lambda_A so B only grows if it genuinely helps
-    A_quad, b_quad, B_quad = train_quadratic(train_eps, lambda_A=6e-2, lambda_b=1e-4, lambda_B=1e-3)
+    if len(trajectory_episodes) < N_FOLDS:
+        print(f"ERROR: Need at least {N_FOLDS} trajectory episodes.")
+        return
 
-    # 5) Summary statistics on test set
-    raw_norm  = mean_drift_norm(test_eps, A_RAW, b_RAW)
-    lin_norm  = mean_drift_norm(test_eps, A_lin,  b_lin)
-    quad_norm = mean_drift_norm(test_eps, A_quad, b_quad, B=B_quad)
+    # K-fold CV to measure generalisation
+    lin_results  = run_kfold(trajectory_episodes, b_fixed, model='linear')
+    quad_results = run_kfold(trajectory_episodes, b_fixed, model='quadratic')
 
-    print("\n=== SUMMARY (mean drift norm — test episodes) ===")
-    print(f"  Raw:       {raw_norm:.6f} rad  ({np.degrees(raw_norm):.4f} deg)")
-    print(f"  Linear:    {lin_norm:.6f} rad  ({np.degrees(lin_norm):.4f} deg)"
-          f"  [{(1 - lin_norm / raw_norm):.2%} reduction]")
-    print(f"  Quadratic: {quad_norm:.6f} rad  ({np.degrees(quad_norm):.4f} deg)"
-          f"  [{(1 - quad_norm / raw_norm):.2%} reduction]")
+    lin_mean  = lin_results['reductions'].mean()
+    quad_mean = quad_results['reductions'].mean()
 
-    if quad_norm < lin_norm * 0.9:
-        print("\n  → Quadratic gives >10% improvement over linear. Use quadratic model.")
-        print("  → Copy A_quad, b_quad, B_quad into updateOrientation.")
+    print(f"\n{'='*55}")
+    print("FINAL COMPARISON")
+    print(f"{'='*55}")
+    print(f"  Linear    mean reduction: {lin_mean:.2%}  "
+          f"(std: {lin_results['reductions'].std():.2%})")
+    print(f"  Quadratic mean reduction: {quad_mean:.2%}  "
+          f"(std: {quad_results['reductions'].std():.2%})")
+
+    use_quadratic = quad_mean > lin_mean * 1.1
+
+    if use_quadratic:
+        print("\n  → Quadratic gives >10% improvement. Use quadratic model.")
     else:
-        print("\n  → Linear model is sufficient. Quadratic adds little benefit.")
-        print("  → Copy A_lin, b_lin into updateOrientation.")
+        print("\n  → Linear model is sufficient.")
 
-    # 6) Detailed per-episode output (first 5 test episodes)
-    print("\n--- Detailed evaluate() — linear model ---")
-    evaluate(test_eps, A_lin, b_lin, B=None)
+    # ── Train final model on ALL trajectory episodes ──────────────────────────
+    print(f"\n{'='*55}")
+    print("FINAL MODEL — trained on all trajectory episodes")
+    print("(Copy these parameters into updateOrientation)")
+    print(f"{'='*55}")
 
-    print("\n--- Detailed evaluate() — quadratic model ---")
-    evaluate(test_eps, A_quad, b_quad, B=B_quad)
+    if use_quadratic:
+        A_final, b_final, B_final = train_quadratic(
+            trajectory_episodes, b_fixed, LAMBDA_A, LAMBDA_B
+        )
+        print("\nDeploy quadratic model in updateOrientation:")
+        print("  gyro_corrected = A @ gyro_raw + B @ (gyro_raw ** 2) + b")
+    else:
+        A_final, b_final = train_linear(
+            trajectory_episodes, b_fixed, LAMBDA_A
+        )
+        B_final = None
+        print("\nDeploy linear model in updateOrientation:")
+        print("  gyro_corrected = A @ gyro_raw + b")
+
+    print(f"\n  A =\n{A_final}")
+    print(f"  b = {b_final}")
+    if B_final is not None:
+        print(f"  B =\n{B_final}")
+
+    # ── Detailed per-episode evaluate ─────────────────────────────────────────
+    print(f"\n{'='*55}")
+    print("DETAILED EVALUATE — first 5 trajectory episodes (final model)")
+    print(f"{'='*55}")
+    evaluate(trajectory_episodes, A_final, b_final, B=B_final)
 
 
 if __name__ == "__main__":

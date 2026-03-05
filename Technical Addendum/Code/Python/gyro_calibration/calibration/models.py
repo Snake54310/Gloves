@@ -8,10 +8,6 @@ def apply_correction(omega, A, b, B=None):
     Linear model:    w_corr = A @ w + b
     Quadratic model: w_corr = A @ w + B @ w² + b
 
-    A should be close to identity (scale/cross-axis correction).
-    b should be small (bias correction).
-    B should be very small (quadratic drift correction).
-
     Parameters
     ----------
     omega : np.ndarray, shape (3,)
