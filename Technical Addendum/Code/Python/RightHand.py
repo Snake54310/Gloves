@@ -288,7 +288,7 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         gyro_raw = np.array([wristGyroRadssX, wristGyroRadssY, wristGyroRadssZ])
 
         # Apply quadratic calibration: corrected = raw - (A @ raw + B @ raw² + b)
-        gyro_corrected = gyro_raw - (
+        gyro_corrected = (
                 self.A_opt @ gyro_raw
                 + self.B_opt @ (gyro_raw ** 2)
                 + self.b_opt.flatten()
