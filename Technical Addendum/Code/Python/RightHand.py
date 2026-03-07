@@ -248,7 +248,7 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         self.pinkyGyroY = 0
         self.pinkyGyroZ = 0
 
-        self.A_opt = np.array([[ 9.97862210e-01, 1.04987658e-04, -1.20816466e-03],
+        self.A_opt = np.array([[9.97862210e-01, 1.04987658e-04, -1.20816466e-03],
              [ 1.93651585e-04, 9.97694642e-01, 5.37106428e-04],
              [-8.15198768e-04, 1.94860588e-04, 9.97199525e-01]])
 
