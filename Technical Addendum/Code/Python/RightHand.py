@@ -249,17 +249,17 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         self.pinkyGyroY = 0
         self.pinkyGyroZ = 0
 
-        self.A_opt = np.array([[ 9.97332628e-01,  1.12050378e-04, -7.33705329e-04],
-             [ 2.45214985e-04,  9.97270863e-01,  1.70131172e-03],
-             [-6.52609217e-04,  6.82822342e-04,  9.95507970e-01]])
+        self.A_opt = np.array([[ 9.95775502e-01, 1.65645801e-04, -1.20056344e-03],
+         [ 3.09877739e-04, 9.95784309e-01, 2.54148486e-03],
+         [-1.08158230e-03, 9.67442221e-04, 9.92217936e-01]])
 
-        self.B_opt =  np.array([[ 0.00167398, -0.03091576, -0.00195969],
-             [ 0.00710383,  0.00684584,  0.00386646],
-             [ 0.00752961, -0.01747535,  0.00112488]])
+        self.B_opt =  np.array([[ 0.00191894, -0.03092158, -0.00056119],
+         [ 0.00607713, 0.00587784, 0.00473651],
+         [ 0.00612615, -0.01794116, 0.00221128]])
 
         self.b_opt = np.array([-0.01106485, -0.00100655, -0.00118413])
-        self.orientation_q = Rotation.identity()
 
+        self.orientation_q = Rotation.identity()
         self.thumb_q = Rotation.identity()
         self.pointer_q = Rotation.identity()
         self.middle_q = Rotation.identity()
