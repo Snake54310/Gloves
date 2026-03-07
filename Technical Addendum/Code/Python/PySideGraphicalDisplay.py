@@ -122,6 +122,8 @@ class GloveMonitorWindow(QMainWindow):
         self.event_timer.timeout.connect(self.process_events)
         self.event_timer.start(10)  # Process events every 10ms
 
+        self.sampleIndex = 0
+
         # Temporary code for getting gyroscope data
         self.session = 0
         self.recordWristGyro = False
@@ -359,6 +361,7 @@ class GloveMonitorWindow(QMainWindow):
             try:
                 # get finger angles, convert to joint-based information
                 # and store as variables of right-hand object
+                SRM = 2 # sample rate multiplier
                 thumbAngle = getThumbAngle(dataArray[0])
                 pointerAngle = getFingerAngle(dataArray[1])
                 middleAngle = getFingerAngle(dataArray[2])
@@ -374,11 +377,12 @@ class GloveMonitorWindow(QMainWindow):
                 j1Angles = self.rightHand.getJ1Angles()
                 j2Angles = self.rightHand.getJ2Angles()
 
-                self.animationView.setAnglesPointer(j1Angles[1], j2Angles[0])
-                self.animationView.setAnglesMiddle(j1Angles[2], j2Angles[1])
-                self.animationView.setAnglesRing(j1Angles[3], j2Angles[2])
-                self.animationView.setAnglesPinky(j1Angles[4], j2Angles[3])
-                self.animationView.setAngleThumb(j1Angles[0])
+                if self.sampleIndex == SRM:
+                    self.animationView.setAnglesPointer(j1Angles[1], j2Angles[0])
+                    self.animationView.setAnglesMiddle(j1Angles[2], j2Angles[1])
+                    self.animationView.setAnglesRing(j1Angles[3], j2Angles[2])
+                    self.animationView.setAnglesPinky(j1Angles[4], j2Angles[3])
+                    self.animationView.setAngleThumb(j1Angles[0])
 
             except (ValueError, TypeError) as e:
                 print(f"Waiting for Legible Flex Values: {e}")
@@ -401,22 +405,28 @@ class GloveMonitorWindow(QMainWindow):
             # Update Displayed Wrist Orientation
             wristXYZ = self.rightHand.getOrientation()
 
-            self.animationView.setOrientationPalm(wristXYZ[0], wristXYZ[1], wristXYZ[2])
+            if self.sampleIndex == SRM:
+                self.animationView.setOrientationPalm(wristXYZ[0], wristXYZ[1], wristXYZ[2])
 
             j0Angles = self.rightHand.getRelativeOrientations()
-
-            self.animationView.setOrientationFingers(j0Angles)
+            if self.sampleIndex == SRM:
+                self.animationView.setOrientationFingers(j0Angles)
 
             # Update displayed finger angles
             j1Angles = self.rightHand.getJ1Angles()
             j2Angles = self.rightHand.getJ2Angles()
 
-            self.animationView.setAnglesPointer(j1Angles[1], j2Angles[0])
-            self.animationView.setAnglesMiddle(j1Angles[2], j2Angles[1])
-            self.animationView.setAnglesRing(j1Angles[3], j2Angles[2])
-            self.animationView.setAnglesPinky(j1Angles[4], j2Angles[3])
-            self.animationView.setAngleThumb(j1Angles[0])
+            if self.sampleIndex == SRM:
+                self.animationView.setAnglesPointer(j1Angles[1], j2Angles[0])
+                self.animationView.setAnglesMiddle(j1Angles[2], j2Angles[1])
+                self.animationView.setAnglesRing(j1Angles[3], j2Angles[2])
+                self.animationView.setAnglesPinky(j1Angles[4], j2Angles[3])
+                self.animationView.setAngleThumb(j1Angles[0])
 
+            if self.sampleIndex == SRM:
+                self.sampleIndex = 0
+
+        self.sampleIndex = self.sampleIndex + 1
         updateAnimation(dataArray)
 
         # View-specific label updates
@@ -511,16 +521,17 @@ class GloveMonitorWindow(QMainWindow):
         if record:
             fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
             new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': wristwX, 'wy': wristwY, 'wz': wristwZ, 'marker': marker}
-            with open('gyro_log.csv', 'a', newline='') as f:
+            with open('gyro_log2.csv', 'a', newline='') as f:
                 writer = DictWriter(f, fieldnames=fields)
                 writer.writerow(new_row)
+        '''
         if ((not record) or (self.beginWristGyro) or (self.endWristGyro)) and self.startedRecording:
             fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
             new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': wristwX, 'wy': wristwY, 'wz': wristwZ,
                        'marker': marker2}
             with open('gyro_stationary.csv', 'a', newline='') as f:
                 writer = DictWriter(f, fieldnames=fields)
-                writer.writerow(new_row)
+                writer.writerow(new_row)'''
 
         self.beginWristGyro = False
         self.endWristGyro = False

@@ -10,7 +10,7 @@
 elapsedMillis elapsedTime;
 
 //Sample 10 times/sec
-int samplePeriod = 100;
+int samplePeriod = 50; // Rate (Hz) = 1000 /samplePeriod
 
 //Device State Controls
 enum : byte {idle,cal1,cal2,collecting} state;
@@ -247,32 +247,32 @@ void sensorCalls() {
     //Select each IMU, read acceleration and gyro. In case of errors, output "E,E,E,E,E,E"
     //Thumb
     pcaselect(7);
-    delay(5);  // ADDED: Give I2C bus time to stabilize after channel switch
+    delay(2);  // ADDED: Give I2C bus time to stabilize after channel switch
     icm.getEvent(&accel7, &gyro7, &temp7);
     finger0Data = String(accel7.acceleration.x) + "," + String(accel7.acceleration.y) + "," + String(accel7.acceleration.z) + "," + String(gyro7.gyro.x) + "," + String(gyro7.gyro.y) + "," + String(gyro7.gyro.z) + ",";
     // FIXED: Changed gyro0 to gyro7 for thumb
 
     //Pointer
     pcaselect(3);
-    delay(5);  // ADDED: Delay after channel switch
+    delay(2);  // ADDED: Delay after channel switch
     icm.getEvent(&accel3, &gyro3, &temp3);
     finger1Data = String(accel3.acceleration.x) + "," + String(accel3.acceleration.y) + "," + String(accel3.acceleration.z) + "," + String(gyro3.gyro.x) + "," + String(gyro3.gyro.y) + "," + String(gyro3.gyro.z) + ",";
 
     //Middle
     pcaselect(2);
-    delay(5);  // ADDED: Delay after channel switch
+    delay(2);  // ADDED: Delay after channel switch
     icm.getEvent(&accel2, &gyro2, &temp2);
     finger2Data = String(accel2.acceleration.x) + "," + String(accel2.acceleration.y) + "," + String(accel2.acceleration.z) + "," + String(gyro2.gyro.x) + "," + String(gyro2.gyro.y) + "," + String(gyro2.gyro.z) + ",";
 
     //Ring
     pcaselect(1);
-    delay(5);  // ADDED: Delay after channel switch
+    delay(2);  // ADDED: Delay after channel switch
     icm.getEvent(&accel1, &gyro1, &temp1);
     finger3Data = String(accel1.acceleration.x) + "," + String(accel1.acceleration.y) + "," + String(accel1.acceleration.z) + "," + String(gyro1.gyro.x) + "," + String(gyro1.gyro.y) + "," + String(gyro1.gyro.z) + ",";
 
     //Pinky
     pcaselect(0);
-    delay(5);  // ADDED: Delay after channel switch
+    delay(2);  // ADDED: Delay after channel switch
     icm.getEvent(&accel0, &gyro0, &temp0);
     finger4Data = String(accel0.acceleration.x) + "," + String(accel0.acceleration.y) + "," + String(accel0.acceleration.z) + "," + String(gyro0.gyro.x) + "," + String(gyro0.gyro.y) + "," + String(gyro0.gyro.z) + ",";
 
