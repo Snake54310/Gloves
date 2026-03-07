@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from scipy.spatial.transform import Rotation
 
 class Thumb:
     def __init__(self, segment1Length, segment2Length): # segments progressive from base
@@ -257,6 +258,20 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
              [ 0.00752961, -0.01747535,  0.00112488]])
 
         self.b_opt = np.array([-0.01106485, -0.00100655, -0.00118413])
+        self.orientation_q = Rotation.identity()
+
+        self.thumb_q = Rotation.identity()
+        self.pointer_q = Rotation.identity()
+        self.middle_q = Rotation.identity()
+        self.ring_q = Rotation.identity()
+        self.pinky_q = Rotation.identity()
+
+        self.wristGyroDegW = 1.0
+        self.thumbGyroW = 1.0
+        self.pointerGyroW = 1.0
+        self.middleGyroW = 1.0
+        self.ringGyroW = 1.0
+        self.pinkyGyroW = 1.0
 
     def setJ1Angles(self, thumbFlex, pointerFlex, middleFlex, ringFlex, pinkyFlex):
         self.thumb.setJ1Flex(thumbFlex)
@@ -284,85 +299,86 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         return
 
     def updateOrientation(self, wristGyroRadssX, wristGyroRadssY, wristGyroRadssZ):
-        # Construct raw gyro vector
         gyro_raw = np.array([wristGyroRadssX, wristGyroRadssY, wristGyroRadssZ])
 
-        # Apply quadratic calibration: corrected = raw - (A @ raw + B @ raw² + b)
         gyro_corrected = (
                 self.A_opt @ gyro_raw
                 + self.B_opt @ (gyro_raw ** 2)
                 + self.b_opt.flatten()
         )
 
-        # NOTE: SENSOR X_rotation on wrist is in -X direction in animation window
-        # NOTE: Sensor Y and Z rotations are swapped
-        # NOTE: After swapping Sensor Y and Z with window Z and Y, Sensor data for Z in window is reversed (-Z direction)
+        gyro_body = np.array([
+            -gyro_corrected[0],
+            gyro_corrected[2],
+            -gyro_corrected[1],
+        ])
 
-        self.wristGyroDegX = (self.wristGyroDegX - ((gyro_corrected[0] / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.wristGyroDegY = (self.wristGyroDegY + ((gyro_corrected[2] / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.wristGyroDegZ = (self.wristGyroDegZ - ((gyro_corrected[1] / self.sampleRate) * 180 / math.pi) + 360) % 360
+        delta_rot = Rotation.from_rotvec(gyro_body / self.sampleRate)
+        self.orientation_q = self.orientation_q * delta_rot
+
+        euler = self.orientation_q.as_euler('zyx', degrees=True)
+        self.wristGyroDegX = euler[2] % 360
+        self.wristGyroDegY = euler[1] % 360
+        self.wristGyroDegZ = euler[0] % 360
+
+        q = self.orientation_q.as_quat()  # scipy: [x, y, z, w]
+        self.wristGyroDegW = q[3]
 
         return
 
     def updateOrientationFingers(self, thumbX, thumbY, thumbZ, pointerX, pointerY, pointerZ,
                                  middleX, middleY, middleZ, ringX, ringY, ringZ, pinkyX, pinkyY, pinkyZ):
-        self.thumbGyroX = (self.thumbGyroX - ((thumbY / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.thumbGyroY = (self.thumbGyroY + ((thumbX / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.thumbGyroZ = (self.thumbGyroZ + ((thumbZ / self.sampleRate) * 180 / math.pi) + 360) % 360
+        def integrate(q, x, y, z):
+            gyro_body = np.array([-y, x, z])
+            delta_rot = Rotation.from_rotvec(gyro_body / self.sampleRate)
+            return q * delta_rot
 
-        self.pointerGyroX = (self.pointerGyroX - ((pointerY / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.pointerGyroY = (self.pointerGyroY + ((pointerX / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.pointerGyroZ = (self.pointerGyroZ + ((pointerZ / self.sampleRate) * 180 / math.pi) + 360) % 360
+        self.thumb_q = integrate(self.thumb_q, thumbX, thumbY, thumbZ)
+        self.pointer_q = integrate(self.pointer_q, pointerX, pointerY, pointerZ)
+        self.middle_q = integrate(self.middle_q, middleX, middleY, middleZ)
+        self.ring_q = integrate(self.ring_q, ringX, ringY, ringZ)
+        self.pinky_q = integrate(self.pinky_q, pinkyX, pinkyY, pinkyZ)
 
-        self.middleGyroX = (self.middleGyroX - ((middleY / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.middleGyroY = (self.middleGyroY + ((middleX / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.middleGyroZ = (self.middleGyroZ + ((middleZ / self.sampleRate) * 180 / math.pi) + 360) % 360
+        def extract_euler(q):
+            e = q.as_euler('zyx', degrees=True)
+            w = q.as_quat()[3]
+            return e[2] % 360, e[1] % 360, e[0] % 360, w
 
-        self.ringGyroX = (self.ringGyroX - ((ringY / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.ringGyroY = (self.ringGyroY + ((ringX / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.ringGyroZ = (self.ringGyroZ + ((ringZ / self.sampleRate) * 180 / math.pi) + 360) % 360
+        self.thumbGyroX, self.thumbGyroY, self.thumbGyroZ, self.thumbGyroW = extract_euler(self.thumb_q)
+        self.pointerGyroX, self.pointerGyroY, self.pointerGyroZ, self.pointerGyroW = extract_euler(self.pointer_q)
+        self.middleGyroX, self.middleGyroY, self.middleGyroZ, self.middleGyroW = extract_euler(self.middle_q)
+        self.ringGyroX, self.ringGyroY, self.ringGyroZ, self.ringGyroW = extract_euler(self.ring_q)
+        self.pinkyGyroX, self.pinkyGyroY, self.pinkyGyroZ, self.pinkyGyroW = extract_euler(self.pinky_q)
 
-        self.pinkyGyroX = (self.pinkyGyroX - ((pinkyY / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.pinkyGyroY = (self.pinkyGyroY + ((pinkyX / self.sampleRate) * 180 / math.pi) + 360) % 360
-        self.pinkyGyroZ = (self.pinkyGyroZ + ((pinkyZ / self.sampleRate) * 180 / math.pi) + 360) % 360
+        thumbRelativeOrientation = [((self.thumbGyroX - self.wristGyroDegX) + 360) % 360,
+                                    ((self.thumbGyroY + self.wristGyroDegZ) + 360) % 360,
+                                    ((self.thumbGyroZ - self.wristGyroDegY) + 360) % 360]
+        self.thumb.setOrientation(*thumbRelativeOrientation)
 
-        thumbRelativeOrienation = [((self.thumbGyroX - self.wristGyroDegX) + 360) % 360,
-                                   ((self.thumbGyroY + self.wristGyroDegZ) + 360) % 360,
-                                   ((self.thumbGyroZ - self.wristGyroDegY) + 360) % 360]
+        pointerRelativeOrientation = [((self.pointerGyroX - self.wristGyroDegX) + 360) % 360,
+                                      ((self.pointerGyroY + self.wristGyroDegZ) + 360) % 360,
+                                      ((self.pointerGyroZ - self.wristGyroDegY) + 360) % 360]
+        self.pointer.setOrientation(*pointerRelativeOrientation)
 
-        self.thumb.setOrientation(thumbRelativeOrienation[0], thumbRelativeOrienation[1], thumbRelativeOrienation[2])
+        middleRelativeOrientation = [((self.middleGyroX - self.wristGyroDegX) + 360) % 360,
+                                     ((self.middleGyroY + self.wristGyroDegZ) + 360) % 360,
+                                     ((self.middleGyroZ - self.wristGyroDegY) + 360) % 360]
+        self.middle.setOrientation(*middleRelativeOrientation)
 
-        self.thumb.setOrientation(thumbRelativeOrienation[0], thumbRelativeOrienation[1], thumbRelativeOrienation[2])
+        ringRelativeOrientation = [((self.ringGyroX - self.wristGyroDegX) + 360) % 360,
+                                   ((self.ringGyroY + self.wristGyroDegZ) + 360) % 360,
+                                   ((self.ringGyroZ - self.wristGyroDegY) + 360) % 360]
+        self.ring.setOrientation(*ringRelativeOrientation)
 
-        pointerRelativeOrienation = [((self.pointerGyroX - self.wristGyroDegX) + 360) % 360, # self.pointerGyroX - self.wristGyroDegX
-                                     ((self.pointerGyroY + self.wristGyroDegZ) + 360) % 360, # self.pointerGyroY + self.wristGyroDegZ
-                                   #((self.pointerGyroY + ((self.wristGyroDegZ + 180) % 360 - 180) * math.sqrt(3) / 2 + ((self.wristGyroDegY + 180) % 360 - 180) * 1 / 2) + 360) % 360, # self.pointerGyroY + self.wristGyroDegZ
-                                     ((self.pointerGyroZ - self.wristGyroDegY) + 360) % 360] # self.pointerGyroZ - self.wristGyroDegY
-
-        self.pointer.setOrientation(pointerRelativeOrienation[0], pointerRelativeOrienation[1], pointerRelativeOrienation[2])
-
-        middleRelativeOrienation = [((self.middleGyroX - self.wristGyroDegX) + 360) % 360,
-                                    ((self.middleGyroY + self.wristGyroDegZ) + 360) % 360,
-                                    ((self.middleGyroZ - self.wristGyroDegY) + 360) % 360]
-
-        self.middle.setOrientation(middleRelativeOrienation[0], middleRelativeOrienation[1],
-                                   middleRelativeOrienation[2])
-
-        ringRelativeOrienation = [((self.ringGyroX - self.wristGyroDegX) + 360) % 360,
-                                  ((self.ringGyroY + self.wristGyroDegZ) + 360) % 360,
-                                  ((self.ringGyroZ - self.wristGyroDegY) + 360) % 360]
-
-        self.ring.setOrientation(ringRelativeOrienation[0], ringRelativeOrienation[1], ringRelativeOrienation[2])
-
-        pinkyRelativeOrienation = [((self.pinkyGyroX - self.wristGyroDegX) + 360) % 360,
-                                   ((self.pinkyGyroY + self.wristGyroDegZ) + 360) % 360,
-                                   ((self.pinkyGyroZ - self.wristGyroDegY) + 360) % 360]
-
-        self.pinky.setOrientation(pinkyRelativeOrienation[0], pinkyRelativeOrienation[1], pinkyRelativeOrienation[2])
+        pinkyRelativeOrientation = [((self.pinkyGyroX - self.wristGyroDegX) + 360) % 360,
+                                    ((self.pinkyGyroY + self.wristGyroDegZ) + 360) % 360,
+                                    ((self.pinkyGyroZ - self.wristGyroDegY) + 360) % 360]
+        self.pinky.setOrientation(*pinkyRelativeOrientation)
 
         return
 
     def zeroOrientation(self):
+        self.orientation_q = Rotation.identity()
         self.wristGyroDegX = 0
         self.wristGyroDegY = 0
         self.wristGyroDegZ = 0
@@ -391,10 +407,17 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
         self.pinkyGyroX = 0
         self.pinkyGyroY = 0
         self.pinkyGyroZ = 0
+
+        self.thumb_q = Rotation.identity()
+        self.pointer_q = Rotation.identity()
+        self.middle_q = Rotation.identity()
+        self.ring_q = Rotation.identity()
+        self.pinky_q = Rotation.identity()
+
         return
 
     def getOrientation(self):
-        return [self.wristGyroDegX + 90, self.wristGyroDegY, self.wristGyroDegZ]
+        return [self.wristGyroDegX, self.wristGyroDegY, self.wristGyroDegZ]
 
     def getRelativeOrientations(self):
         relativeOrientations = (self.thumb.getOrientation() + self.pointer.getOrientation() +
@@ -441,8 +464,28 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
                     ringJ0X, ringJ0Y, ringJ0Z, pinkyJ0X, pinkyJ0Y, pinkyJ0Z]
         return j0Angles
 
+    def getOrientationQ(self):
+        q = self.orientation_q.as_quat()  # [x, y, z, w]
+        return [q[0], q[1], q[2], q[3]]
 
+    def getRelativeOrientationsQ(self):
+        R_remap = Rotation.from_euler('x', -90, degrees=True)
+        wrist_remapped = self.orientation_q.inv() * R_remap
 
+        def rel_q(finger_q, j1=0.0, j2=0.0):
+            rel = wrist_remapped * finger_q
+            flex_correction = Rotation.from_euler('x', (j1 + j2), degrees=True)
+            corrected = rel * flex_correction
+            q = corrected.as_quat()
+            return [q[0], q[1], q[2], q[3]]
+
+        return (
+                rel_q(self.thumb_q, self.thumb.getJ1Flex()) +
+                rel_q(self.pointer_q, self.pointer.getJ1Flex(), self.pointer.getJ2Flex()) +
+                rel_q(self.middle_q, self.middle.getJ1Flex(), self.middle.getJ2Flex()) +
+                rel_q(self.ring_q, self.ring.getJ1Flex(), self.ring.getJ2Flex()) +
+                rel_q(self.pinky_q, self.pinky.getJ1Flex(), self.pinky.getJ2Flex())
+        )
 
 
 

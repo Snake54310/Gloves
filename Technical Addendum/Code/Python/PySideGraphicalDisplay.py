@@ -406,11 +406,11 @@ class GloveMonitorWindow(QMainWindow):
             wristXYZ = self.rightHand.getOrientation()
 
             if self.sampleIndex == SRM:
-                self.animationView.setOrientationPalm(wristXYZ[0], wristXYZ[1], wristXYZ[2])
+                self.animationView.setOrientationPalm(*self.rightHand.getOrientationQ())
 
             j0Angles = self.rightHand.getRelativeOrientations()
             if self.sampleIndex == SRM:
-                self.animationView.setOrientationFingers(j0Angles)
+                self.animationView.setOrientationFingers(self.rightHand.getRelativeOrientationsQ())
 
             # Update displayed finger angles
             j1Angles = self.rightHand.getJ1Angles()
@@ -495,7 +495,7 @@ class GloveMonitorWindow(QMainWindow):
             gyroN = self.rightHand.getOrientation()  # Returns [roll, pitch, yaw] in degrees
             self.dataLabel9.setText(
                 f'Wrist Orientation (deg):\n'
-                f'X = {format_value(gyroN[0] - 90)}\n'
+                f'X = {format_value(gyroN[0])}\n'
                 f'Y = {format_value(gyroN[1])}\n'
                 f'Z = {format_value(gyroN[2])}'
             )
