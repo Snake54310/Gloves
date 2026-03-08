@@ -1,5 +1,30 @@
 import numpy as np
+from multiprocessing import Pool
+import os
 
+A_REF = np.array([
+    [1.,  0.,  0.],
+    [0.,  1.,  0.],
+    [0.,  0., -1.],
+])
+
+def _integrate_linear(args):
+    ep, A, b_fixed = args
+    T = ep['timestamp'].iloc[-1] - ep['timestamp'].iloc[0]
+    theta = integrate_episode(ep, A, b_fixed)
+    return smooth_l1(theta / T), len(ep)
+
+def _integrate_quadratic(args):
+    ep, A, b_fixed, B = args
+    T = ep['timestamp'].iloc[-1] - ep['timestamp'].iloc[0]
+    theta = integrate_episode(ep, A, b_fixed, B)
+    return smooth_l1(theta / T), len(ep)
+
+def _integrate_bias(args):
+    ep, b = args
+    omega = ep[['wx', 'wy', 'wz']].values
+    mean_corrected = np.mean(omega, axis=0) + b
+    return np.sum(mean_corrected ** 2), len(ep)
 
 def smooth_l1(x, epsilon=1e-4):
     """
@@ -9,7 +34,7 @@ def smooth_l1(x, epsilon=1e-4):
     """
     return np.sum(np.sqrt(x ** 2 + epsilon) - np.sqrt(epsilon))
 
-
+'''
 def integrate_episode(ep, A, b, B=None):
     """
     Apply correction and integrate one episode using the trapezoidal rule.
@@ -43,118 +68,71 @@ def integrate_episode(ep, A, b, B=None):
     theta = np.sum(0.5 * (w_corr[:-1] + w_corr[1:]) * dt[:, None], axis=0)
     return theta
 
-
+'''
 def count_points(episodes):
     return sum(len(ep) for ep in episodes)
 
+def integrate_episode(ep, A, b, B=None):
+    t = ep['timestamp'].values
+    omega = ep[['wx', 'wy', 'wz']].values
+    dt = np.diff(t)
 
-def loss_bias_from_stationary(b, stationary_episodes):
-    """
-    Phase 1 loss — fit b from stationary recordings only.
+    w_corr = (omega @ A.T) + b
+    if B is not None:
+        w_corr = w_corr + (omega ** 2) @ B.T
 
-    When the glove is stationary, true angular velocity is zero.
-    Therefore w_corr = A@w + b = I@w + b should also be zero.
-    The mean of w over a stationary episode equals the DC bias.
-    Minimising the mean squared corrected velocity gives us b directly.
+    w_mid = 0.5 * (w_corr[:-1] + w_corr[1:])
 
-    Loss = (1/N) * Σ_episodes ||mean(w + b)||²
+    def step(q, i):
+        w = w_mid[i]
+        angle = np.linalg.norm(w) * dt[i]
+        if angle < 1e-10:
+            return q
+        axis = w / np.linalg.norm(w)
+        dq = np.append(axis * np.sin(angle / 2), np.cos(angle / 2))
+        x1, y1, z1, w1 = q
+        x2, y2, z2, w2 = dq
+        return np.array([
+            w1*x2 + x1*w2 + y1*z2 - z1*y2,
+            w1*y2 - x1*z2 + y1*w2 + z1*x2,
+            w1*z2 + x1*y2 - y1*x2 + z1*w2,
+            w1*w2 - x1*x2 - y1*y2 - z1*z2
+        ])
 
-    Parameters
-    ----------
-    b : np.ndarray, shape (3,)
-    stationary_episodes : list of pd.DataFrame
-        Episodes recorded with glove completely still.
+    q = np.array([0.0, 0.0, 0.0, 1.0])
+    for i in range(len(dt)):
+        q = step(q, i)
+        q = q / np.linalg.norm(q)
+    return q[:3]
 
-    Returns
-    -------
-    float
-    """
-    N = count_points(stationary_episodes)
-    loss = 0.0
-    for ep in stationary_episodes:
-        omega = ep[['wx', 'wy', 'wz']].values
-        mean_corrected = np.mean(omega, axis=0) + b
-        loss += np.sum(mean_corrected ** 2)
-    return loss / N
+def loss_bias_from_stationary(b, stationary_episodes, pool=None):
+    args = [(ep, b) for ep in stationary_episodes]
+    if pool is not None:
+        results = pool.map(_integrate_bias, args)
+    else:
+        results = [_integrate_bias(a) for a in args]
+    N = sum(r[1] for r in results)
+    return sum(r[0] for r in results) / N
 
-
-def loss_trajectory_linear(params, episodes, b_fixed, lambda_A=1e-3):
-    """
-    Phase 2 loss — fit A with b fixed from phase 1.
-
-    Loss = (1/N) * Σ_episodes (1/T) * ||∫(A@w + b)dt||²
-         + lambda_A * smooth_l1(A - I)
-
-    Normalising by episode duration T makes the loss rate-based,
-    so episodes of different lengths contribute equally and A cannot
-    learn duration-specific corrections.
-
-    Parameters
-    ----------
-    params : np.ndarray, shape (9,)
-        Flattened A matrix.
-    episodes : list of pd.DataFrame
-        Trajectory episodes (closed-loop, start == end orientation).
-    b_fixed : np.ndarray, shape (3,)
-        Bias vector fixed from phase 1.
-    lambda_A : float
-        Smooth-L1 penalty on A deviating from identity.
-
-    Returns
-    -------
-    float
-    """
+def loss_trajectory_linear(params, episodes, b_fixed, lambda_A=1e-3, pool=None):
     A = params[:9].reshape(3, 3)
-    N = count_points(episodes)
+    args = [(ep, A, b_fixed) for ep in episodes]
+    if pool is not None:
+        results = pool.map(_integrate_linear, args)
+    else:
+        results = [_integrate_linear(a) for a in args]
+    N = sum(r[1] for r in results)
+    drift_loss = sum(r[0] for r in results) / N
+    return drift_loss + lambda_A * smooth_l1(A - A_REF)  # changed from np.eye(3)
 
-    drift_loss = 0.0
-    for ep in episodes:
-        T = ep['timestamp'].iloc[-1] - ep['timestamp'].iloc[0]
-        theta = integrate_episode(ep, A, b_fixed)
-        # drift_loss += np.sum((theta / T) ** 2)
-        drift_loss += smooth_l1(theta / T)
-    drift_loss /= N
-
-    reg_A = lambda_A * smooth_l1(A - np.eye(3))
-    return drift_loss + reg_A
-
-
-def loss_trajectory_quadratic(params, episodes, b_fixed, lambda_A=1e-3, lambda_B=1e-2):
-    """
-    Phase 2 loss — fit A and B with b fixed from phase 1.
-
-    Loss = (1/N) * Σ_episodes (1/T) * ||∫(A@w + B@w² + b)dt||²
-         + lambda_A * smooth_l1(A - I)
-         + lambda_B * smooth_l1(B)
-
-    B is penalised more heavily than A so it only activates when
-    the linear term is genuinely insufficient.
-
-    Parameters
-    ----------
-    params : np.ndarray, shape (18,)
-        [A (9, row-major), B (9, row-major)]
-    episodes : list of pd.DataFrame
-    b_fixed : np.ndarray, shape (3,)
-    lambda_A : float
-    lambda_B : float
-
-    Returns
-    -------
-    float
-    """
+def loss_trajectory_quadratic(params, episodes, b_fixed, lambda_A=1e-3, lambda_B=1e-2, pool=None):
     A = params[:9].reshape(3, 3)
     B = params[9:18].reshape(3, 3)
-    N = count_points(episodes)
-
-    drift_loss = 0.0
-    for ep in episodes:
-        T = ep['timestamp'].iloc[-1] - ep['timestamp'].iloc[0]
-        theta = integrate_episode(ep, A, b_fixed, B)
-        # drift_loss += np.sum((theta / T) ** 2)
-        drift_loss += smooth_l1(theta / T)
-    drift_loss /= N
-
-    reg_A = lambda_A * smooth_l1(A - np.eye(3))
-    reg_B = lambda_B * smooth_l1(B)
-    return drift_loss + reg_A + reg_B
+    args = [(ep, A, b_fixed, B) for ep in episodes]
+    if pool is not None:
+        results = pool.map(_integrate_quadratic, args)
+    else:
+        results = [_integrate_quadratic(a) for a in args]
+    N = sum(r[1] for r in results)
+    drift_loss = sum(r[0] for r in results) / N
+    return drift_loss + lambda_A * smooth_l1(A - A_REF) + lambda_B * smooth_l1(B)  # changed

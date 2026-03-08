@@ -5,6 +5,23 @@ from gyro_calibration.calibration.train import fit_bias, train_linear, train_qua
 from gyro_calibration.calibration.loss import integrate_episode
 from gyro_calibration.calibration.evaluate import evaluate, A_RAW, b_RAW
 
+from multiprocessing import Pool
+import os
+
+def mean_drift_norm(episodes, A, b, B=None, pool=None):
+    from gyro_calibration.calibration.loss import integrate_episode
+    args = [(ep, A, b, B) for ep in episodes]
+    if pool is not None:
+        results = pool.map(_integrate_norm, args)
+    else:
+        results = [_integrate_norm(a) for a in args]
+    return np.mean(results)
+
+def _integrate_norm(args):
+    from gyro_calibration.calibration.loss import integrate_episode
+    ep, A, b, B = args
+    return np.linalg.norm(integrate_episode(ep, A, b, B))
+
 # ── File paths ────────────────────────────────────────────────────────────────
 # Stationary CSV: glove sitting completely still, multiple episodes.
 # Trajectory CSV: glove performing arbitrary closed-loop motions.
@@ -14,8 +31,8 @@ STATIONARY_CSV  = "gyro_calibration/data/raw/gyro_stationary.csv"
 TRAJECTORY_CSV  = "gyro_calibration/data/raw/gyro_log.csv"
 
 # ── Hyperparameters ───────────────────────────────────────────────────────────
-LAMBDA_A = 5e-4 # 8e-5   # penalty on A deviating from identity
-LAMBDA_B = 5e-5 # 1e-5 # 1e-5   # penalty on B (higher-order, more conservative)
+LAMBDA_A = 1e-4 # 8e-5   # penalty on A deviating from identity
+LAMBDA_B = 1e-5 # 1e-5 # 1e-5   # penalty on B (higher-order, more conservative)
 N_FOLDS  = 8      # K-fold splits for trajectory CV
 
 
@@ -48,15 +65,15 @@ def extract_episodes(df):
     print(f"  Extracted episodes: {len(episodes)}")
     return episodes
 
-
+'''
 def mean_drift_norm(episodes, A, b, B=None):
     return np.mean([
         np.linalg.norm(integrate_episode(ep, A, b, B=B))
         for ep in episodes
     ])
+'''
 
-
-def run_kfold(trajectory_episodes, b_fixed, model='linear'):
+def run_kfold(trajectory_episodes, b_fixed, model='linear', pool=None):
     """
     K-fold cross-validation over trajectory episodes.
     b is always fixed from phase 1 — never refitted per fold.
@@ -80,13 +97,13 @@ def run_kfold(trajectory_episodes, b_fixed, model='linear'):
               f"(train: {len(train_eps)}, test: {len(test_eps)}) ---")
 
         if model == 'linear':
-            A, b = train_linear(train_eps, b_fixed, LAMBDA_A)
+            A, b = train_linear(train_eps, b_fixed, LAMBDA_A, pool=pool)
             B = None
         else:
-            A, b, B = train_quadratic(train_eps, b_fixed, LAMBDA_A, LAMBDA_B)
+            A, b, B = train_quadratic(train_eps, b_fixed, LAMBDA_A, LAMBDA_B, pool=pool)
 
-        raw_norm  = mean_drift_norm(test_eps, A_RAW, b_RAW)
-        corr_norm = mean_drift_norm(test_eps, A, b, B=B)
+        raw_norm = mean_drift_norm(test_eps, A_RAW, b_RAW, pool=pool)
+        corr_norm = mean_drift_norm(test_eps, A, b, B=B, pool=pool)
         reduction = 1.0 - corr_norm / raw_norm if raw_norm > 0 else 0.0
 
         print(f"  Fold {fold + 1}: raw={raw_norm:.6f} rad  "
@@ -108,7 +125,7 @@ def run_kfold(trajectory_episodes, b_fixed, model='linear'):
     return {'fold_raw': fold_raw, 'fold_corr': fold_corr, 'reductions': reductions}
 
 
-def main():
+def main(pool):
     # ── Phase 1: fit b from stationary data ──────────────────────────────────
     print("Loading stationary data...")
     df_stat = load_and_clean_csv(STATIONARY_CSV)
@@ -119,7 +136,7 @@ def main():
               "Record the glove sitting still with start/end markers.")
         return
 
-    b_fixed = fit_bias(stationary_episodes)
+    b_fixed = fit_bias(stationary_episodes, pool=pool)
 
     # ── Phase 2: fit A (and B) from trajectory data ───────────────────────────
     print("\nLoading trajectory data...")
@@ -131,8 +148,8 @@ def main():
         return
 
     # K-fold CV to measure generalisation
-    lin_results  = run_kfold(trajectory_episodes, b_fixed, model='linear')
-    quad_results = run_kfold(trajectory_episodes, b_fixed, model='quadratic')
+    lin_results  = run_kfold(trajectory_episodes, b_fixed, model='linear',    pool=pool)
+    quad_results = run_kfold(trajectory_episodes, b_fixed, model='quadratic', pool=pool)
 
     lin_mean  = lin_results['reductions'].mean()
     quad_mean = quad_results['reductions'].mean()
@@ -145,10 +162,10 @@ def main():
     print(f"  Quadratic mean reduction: {quad_mean:.2%}  "
           f"(std: {quad_results['reductions'].std():.2%})")
 
-    use_quadratic = quad_mean > lin_mean * 1.1
+    use_quadratic = True # quad_mean > lin_mean * 1.02
 
     if use_quadratic:
-        print("\n  → Quadratic gives >10% improvement. Use quadratic model.")
+        print("\n  → Quadratic gives >2% improvement. Use quadratic model.")
     else:
         print("\n  → Linear model is sufficient.")
 
@@ -160,13 +177,13 @@ def main():
 
     if use_quadratic:
         A_final, b_final, B_final = train_quadratic(
-            trajectory_episodes, b_fixed, LAMBDA_A, LAMBDA_B
+            trajectory_episodes, b_fixed, LAMBDA_A, LAMBDA_B, pool=pool
         )
         print("\nDeploy quadratic model in updateOrientation:")
         print("  gyro_corrected = A @ gyro_raw + B @ (gyro_raw ** 2) + b")
     else:
         A_final, b_final = train_linear(
-            trajectory_episodes, b_fixed, LAMBDA_A
+            trajectory_episodes, b_fixed, LAMBDA_A, pool=pool
         )
         B_final = None
         print("\nDeploy linear model in updateOrientation:")
@@ -185,4 +202,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with Pool(processes=os.cpu_count()) as pool:
+        main(pool)
