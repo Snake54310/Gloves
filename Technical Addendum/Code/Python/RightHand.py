@@ -309,7 +309,7 @@ class RightHand: # NOTE: if two distinct hand classes are not necessary, backtra
 
         gyro_body = np.array([
             -gyro_corrected[0],
-            gyro_corrected[2],
+            -gyro_corrected[2],
             -gyro_corrected[1],
         ])
 
