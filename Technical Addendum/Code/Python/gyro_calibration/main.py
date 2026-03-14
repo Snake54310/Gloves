@@ -31,9 +31,17 @@ STATIONARY_CSV  = "gyro_calibration/data/raw/gyro_stationary.csv"
 TRAJECTORY_CSV  = "gyro_calibration/data/raw/gyro_log.csv"
 
 # ── Hyperparameters ───────────────────────────────────────────────────────────
+# Wrist:
+'''
 LAMBDA_A = 1e-4 # 8e-5   # penalty on A deviating from identity
 LAMBDA_B = 1e-5 # 1e-5 # 1e-5   # penalty on B (higher-order, more conservative)
 N_FOLDS  = 8      # K-fold splits for trajectory CV
+'''
+
+# Fingers:
+LAMBDA_A = 1e-4 # 8e-5   # penalty on A deviating from identity
+LAMBDA_B = 1e-5 # 1e-5 # 1e-5   # penalty on B (higher-order, more conservative)
+N_FOLDS  = 5      # K-fold splits for trajectory CV
 
 
 def load_and_clean_csv(path):

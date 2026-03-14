@@ -2,11 +2,21 @@ import numpy as np
 from multiprocessing import Pool
 import os
 
+# FOR WRIST (-z):
+'''=
 A_REF = np.array([
     [1.,  0.,  0.],
     [0.,  1.,  0.],
     [0.,  0., -1.],
 ])
+'''
+# FOR FINGERS (-y):
+A_REF = np.array([
+    [1., 0.,  0.],
+    [0.,  1.,  0.],
+    [0.,  0., 1.],
+])
+
 
 def _integrate_linear(args):
     ep, A, b_fixed = args
