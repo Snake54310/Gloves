@@ -390,7 +390,14 @@ class GloveMonitorWindow(QMainWindow):
 
             try:
                 self.rightHand.updateSampleRate(self.estimated_sample_rate)
-                self.recordGyroData(timestamp, float(dataArray[38]), float(dataArray[39]), float(dataArray[40])) # temporary for collecting wrist gyro data
+                # temporary for collecting wrist gyro data
+                self.recordGyroData(timestamp, float(dataArray[38]), float(dataArray[39]), float(dataArray[40]),
+                                                        float(dataArray[8]), float(dataArray[9]), float(dataArray[10]), # Thumb
+                                                        float(dataArray[14]), float(dataArray[15]), float(dataArray[16]), # Pointer
+                                                        float(dataArray[20]), float(dataArray[21]), float(dataArray[22]), # Middle
+                                                        float(dataArray[26]), float(dataArray[27]), float(dataArray[28]),  # Ring
+                                                        float(dataArray[32]), float(dataArray[33]), float(dataArray[34])   # Pinky
+                                                        ) # temporary for collecting wrist gyro data
                 self.rightHand.updateOrientation(float(dataArray[38]), float(dataArray[39]), float(dataArray[40]))
                 self.rightHand.updateOrientationFingers(float(dataArray[8]), float(dataArray[9]), float(dataArray[10]), # Thumb
                                                         float(dataArray[14]), float(dataArray[15]), float(dataArray[16]), # Pointer
@@ -499,7 +506,7 @@ class GloveMonitorWindow(QMainWindow):
                 f'Y = {format_value(gyroN[1])}\n'
                 f'Z = {format_value(gyroN[2])}'
             )
-    def recordGyroData(self, timestamp, wristwX, wristwY, wristwZ): # temporary for recording wrist gyro data
+    def recordGyroData(self, timestamp, wristwX, wristwY, wristwZ, tx, ty, tz, pox, poy, poz, mx, my, mz, rx, ry, rz, pix, piy, piz): # temporary for recording wrist gyro data
         marker = ""
         marker2 = ""
         record = self.recordWristGyro
@@ -524,14 +531,85 @@ class GloveMonitorWindow(QMainWindow):
             with open('gyro_log2.csv', 'a', newline='') as f:
                 writer = DictWriter(f, fieldnames=fields)
                 writer.writerow(new_row)
-        '''
-        if ((not record) or (self.beginWristGyro) or (self.endWristGyro)) and self.startedRecording:
+
             fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
-            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': wristwX, 'wy': wristwY, 'wz': wristwZ,
-                       'marker': marker2}
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': tx, 'wy': ty, 'wz': tz,
+                       'marker': marker}
+            with open('gyro_log_thumb.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': pox, 'wy': poy, 'wz': poz,
+                       'marker': marker}
+            with open('gyro_log_point.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': mx, 'wy': my, 'wz': mz,
+            'marker': marker}
+            with open('gyro_log_mid.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': rx, 'wy': ry, 'wz': rz,
+            'marker': marker}
+            with open('gyro_log_ring.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': pix, 'wy': piy, 'wz': piz,
+            'marker': marker}
+            with open('gyro_log_pink.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            # --------------------------------- STATIONARY WRITES -------------------------------------
+            '''
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': wristwX, 'wy': wristwY, 'wz': wristwZ, 'marker': marker}
             with open('gyro_stationary.csv', 'a', newline='') as f:
                 writer = DictWriter(f, fieldnames=fields)
-                writer.writerow(new_row)'''
+                writer.writerow(new_row)
+                
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': tx, 'wy': ty, 'wz': tz,
+                       'marker': marker}
+            with open('gyro_log_thumb_s.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': pox, 'wy': poy, 'wz': poz,
+                       'marker': marker}
+            with open('gyro_log_point_s.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': mx, 'wy': my, 'wz': mz,
+            'marker': marker}
+            with open('gyro_log_mid_s.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': rx, 'wy': ry, 'wz': rz,
+            'marker': marker}
+            with open('gyro_log_ring_s.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+
+            fields = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
+            new_row = {'episode_id': self.session, 'timestamp': timestamp, 'wx': pix, 'wy': piy, 'wz': piz,
+            'marker': marker}
+            with open('gyro_log_pink_s.csv', 'a', newline='') as f:
+                writer = DictWriter(f, fieldnames=fields)
+                writer.writerow(new_row)
+            '''
 
         self.beginWristGyro = False
         self.endWristGyro = False
