@@ -6,11 +6,11 @@
 #include <elapsedMillis.h>
 
 //Timer for data collection
-//elapsedMilis was used so that USB output can buffer even while sensors are running
+//elapsedMillis was used so that USB output can buffer even while sensors are running
 elapsedMillis elapsedTime;
 
-//Sample 10 times/sec
-int samplePeriod = 100;
+//Sample 20 times/sec (matches Right Hand)
+int samplePeriod = 50; // Rate (Hz) = 1000 / samplePeriod
 
 //Device State Controls
 enum : byte {idle,cal1,cal2,collecting} state;
@@ -30,7 +30,7 @@ sensors_event_t accel7,gyro7,temp7;
 
 //Variables for IMU multiplexer
 bool IMU_found = false;
-//Edit if IMUs are connected to differnt ports on the multiplexer
+//Edit if IMUs are connected to different ports on the multiplexer
 int PCA_ports_connected [] = {7,3,2,1,0};
 
 //variables to store IMU data
@@ -83,7 +83,7 @@ void setup() {
 
   //Wait for serial and IMUs to boot
   while (!Serial);
-    delay(1000);
+  delay(1000);
   Wire.begin();
   Serial.begin(2000000);
   if (!IMU.begin()) {
@@ -117,7 +117,7 @@ void setup() {
   calibration1Done = false;
   calibration2Done = false;
   pcaselect(0);
-  handType = "L";
+  handType = "L";          // Left hand distinction preserved
   delay(1000);
 }
 
@@ -218,7 +218,7 @@ void calibration2() {
 //sensorCalls: Read all sensors, print results over serial to be read by Python script
 void sensorCalls() {
   if (elapsedTime > samplePeriod){
-    elapsedTime = 0;  // CRITICAL FIX: Reset timer to maintain 10 Hz sampling rate
+    elapsedTime = 0;  // CRITICAL FIX: Reset timer to maintain consistent sampling rate
     
     // Read flex sensors
     shortFSReading = analogRead(shortFSPin);
@@ -244,35 +244,34 @@ void sensorCalls() {
     //Format output to be sent out
     fsOut = String(shortFSReading_adj) + "," + String(longFSReading1_adj) + "," + String(longFSReading2_adj) + "," + String(longFSReading3_adj) + "," + String(longFSReading4_adj) + ",";
 
-    //Select each IMU, read acceleration and gyro. In case of errors, output "E,E,E,E,E,E"
+    //Select each IMU, read acceleration and gyro.
     //Thumb
     pcaselect(7);
-    delay(5);  // ADDED: Give I2C bus time to stabilize after channel switch
+    delay(2);  // Matches Right Hand timing
     icm.getEvent(&accel7, &gyro7, &temp7);
     finger0Data = String(accel7.acceleration.x) + "," + String(accel7.acceleration.y) + "," + String(accel7.acceleration.z) + "," + String(gyro7.gyro.x) + "," + String(gyro7.gyro.y) + "," + String(gyro7.gyro.z) + ",";
-    // FIXED: Changed gyro0 to gyro7 for thumb
 
     //Pointer
     pcaselect(3);
-    delay(5);  // ADDED: Delay after channel switch
+    delay(2);
     icm.getEvent(&accel3, &gyro3, &temp3);
     finger1Data = String(accel3.acceleration.x) + "," + String(accel3.acceleration.y) + "," + String(accel3.acceleration.z) + "," + String(gyro3.gyro.x) + "," + String(gyro3.gyro.y) + "," + String(gyro3.gyro.z) + ",";
 
     //Middle
     pcaselect(2);
-    delay(5);  // ADDED: Delay after channel switch
+    delay(2);
     icm.getEvent(&accel2, &gyro2, &temp2);
     finger2Data = String(accel2.acceleration.x) + "," + String(accel2.acceleration.y) + "," + String(accel2.acceleration.z) + "," + String(gyro2.gyro.x) + "," + String(gyro2.gyro.y) + "," + String(gyro2.gyro.z) + ",";
 
     //Ring
     pcaselect(1);
-    delay(5);  // ADDED: Delay after channel switch
+    delay(2);
     icm.getEvent(&accel1, &gyro1, &temp1);
     finger3Data = String(accel1.acceleration.x) + "," + String(accel1.acceleration.y) + "," + String(accel1.acceleration.z) + "," + String(gyro1.gyro.x) + "," + String(gyro1.gyro.y) + "," + String(gyro1.gyro.z) + ",";
 
     //Pinky
     pcaselect(0);
-    delay(5);  // ADDED: Delay after channel switch
+    delay(2);
     icm.getEvent(&accel0, &gyro0, &temp0);
     finger4Data = String(accel0.acceleration.x) + "," + String(accel0.acceleration.y) + "," + String(accel0.acceleration.z) + "," + String(gyro0.gyro.x) + "," + String(gyro0.gyro.y) + "," + String(gyro0.gyro.z) + ",";
 
@@ -281,17 +280,16 @@ void sensorCalls() {
       IMU.readAcceleration(palmAccX, palmAccY, palmAccZ);
       palmOutAcc = String(palmAccX) + "," + String(palmAccY) + "," + String(palmAccZ) + ",";
     } else {
-      palmOutAcc = "E,E,E,";  // FIXED: Store in variable instead of printing directly
+      palmOutAcc = "E,E,E,";
     }
     if (IMU.gyroscopeAvailable()) {
       IMU.readGyroscope(palmGyroX, palmGyroY, palmGyroZ);
       palmOutGyro = String(palmGyroX) + "," + String(palmGyroY) + "," + String(palmGyroZ) + ",";
     } else {
-      palmOutGyro = "E,E,E,";  // FIXED: Store in variable instead of printing directly
+      palmOutGyro = "E,E,E,";
     }
     
-    //Print data in CSV format over serial in the following format
-    //  flex (each finger), acceleration XYZ, gyro XYZ (each finger), acceleration XYZ, gyro XYZ (wrist), hand type (L/R)
+    //Print data in CSV format over serial
     Serial.println(fsOut + finger0Data + finger1Data + finger2Data + finger3Data + finger4Data + palmOutAcc + palmOutGyro + handType);
   }
 }

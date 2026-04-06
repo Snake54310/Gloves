@@ -91,8 +91,8 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
 
         # Position the camera above and in front of the hand model.
         # The hand sits near the origin; this angle gives a good overview.
-        camera.setPosition(QVector3D(5, -30, 50))
-        camera.setViewCenter(QVector3D(5, 0, 0))   # look toward the hand
+        camera.setPosition(QVector3D(-5, -30, 50))
+        camera.setViewCenter(QVector3D(-5, 0, 0))   # look toward the hand
         camera.setUpVector(QVector3D(0, 0, 1))      # Z is "up" in this scene
 
         # QOrbitCameraController lets the user rotate, pan, and zoom with the mouse.
@@ -204,7 +204,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.entity_Palm, self.transform_Palm = self._make_segment_entity(
             self.rootEntity, PALM_RADIUS, PALM_LENGTH
         )
-        self.transform_Palm.setTranslation(QVector3D(5, -10, 0))
+        self.transform_Palm.setTranslation(QVector3D(-5, -10, 0))
         # +90° X rotation: cylinder created along Y, rotation tips it so the
         # circular faces point up (+Z) and down (-Z) — flat "hand" orientation.
         self.transform_Palm.setRotation(
@@ -313,10 +313,10 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
 
         finger_specs = [
             # (name,     prox_len, mid_len, dist_len, x_offset)
-            ('Pointer',  8.0,      5.0,     4.0,      -6),
-            ('Middle',   10.0,     5.5,     4.0,       -2),
-            ('Ring',     9.0,      5.0,     4.0,       2),
-            ('Pinky',    5.0,      4.0,     4.0,       6),
+            ('Pointer',  8.0,      5.0,     4.0,       6),
+            ('Middle',   10.0,     5.5,     4.0,       2),
+            ('Ring',     9.0,      5.0,     4.0,       -2),
+            ('Pinky',    5.0,      4.0,     4.0,      -6),
         ]
 
         for name, prox_len, mid_len, dist_len, x_off in finger_specs:
@@ -350,7 +350,7 @@ class AnimationWindow(Qt3DExtras.Qt3DWindow):
         self.proximal_transform_Thumb.setTranslation(
             # The -10 offset in Z (compared to the four fingers) positions the thumb
             # beside the palm rather than directly above its far edge.
-            QVector3D(-10, 0, -(self._palm_radius + PROX_LEN / 2 - 10))
+            QVector3D(10, 0, -(self._palm_radius + PROX_LEN / 2 - 10))
         )
         self.proximal_transform_Thumb.setRotation(
             QQuaternion.fromAxisAndAngle(QVector3D(-1, 0, 0), 90)
