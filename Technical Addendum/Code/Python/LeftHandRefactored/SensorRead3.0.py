@@ -73,7 +73,8 @@ def data_acquire(port, baudRate, outputFileName):
         set_status("Reading data...")
 
         if reader:
-            reader.write(b"ON")
+            #print("data collection initiated")
+            reader.write(b"ON\n")
         startTime = time.perf_counter()
         csvFile = open(outputFileName, 'w', newline='')
         csvWriter = csv.writer(csvFile, lineterminator='\n')
@@ -126,7 +127,7 @@ def stop_data():
     set_status("Stopping...")
     enable = False
     if reader:
-        reader.write(b"OFF")
+        reader.write(b"OFF\n")
     stopButton.config(state=tk.DISABLED)
     startButton.config(state=tk.NORMAL)
     set_status("Data saved to " + outputFileName)
@@ -224,7 +225,7 @@ def calibrate_gloves():
 def calibration1():
     global reader
     if(reader):
-        reader.write(b"CAL1")
+        reader.write(b"CAL1\n")
     #Lift second calibration frame, with button to continue
     calibrationFrame2.lift()
 
@@ -232,7 +233,7 @@ def calibration1():
 #calibrate glove's maximum flex value
 def calibration2():
     global reader
-    reader.write(b"CAL2")
+    reader.write(b"CAL2\n")
     calibrationFinishedFrame.lift()
 
 #finishCalibration()
@@ -309,7 +310,8 @@ if __name__ == "__main__":
     calibrationFrame1.grid_columnconfigure(0, weight=1)
 
     calibrationLabel1 = ttk.Label(calibrationFrame1,
-                                  text="Place your hand on a flat surface with fingers spread, then press next")
+                                  text="Place your hand on a flat surface with fingers spread as wide as possible."
+                                       "\n Wait a few seconds, then press next")
     calibrationLabel1.grid(column=0, row=0, sticky="EW")
 
     nextButtonCal1 = ttk.Button(calibrationFrame1, text="Next", command=calibration1)
@@ -320,7 +322,8 @@ if __name__ == "__main__":
     calibrationFrame2.grid(column=0, row=0, padx=10, pady=10, sticky="NSEW")
     calibrationFrame2.grid_columnconfigure(0, weight=1)
 
-    calibrationLabel2 = ttk.Label(calibrationFrame2, text="Now, make a fist with your thumb tucked, then press next")
+    calibrationLabel2 = ttk.Label(calibrationFrame2, text="Now, bend your fingers as much as possible similar to a fist."
+                                                          "\n Wait a few seconds, then press next")
     calibrationLabel2.grid(column=0, row=0, sticky="EW")
 
     nextButtonCal2 = ttk.Button(calibrationFrame2, text="Next", command=calibration2)

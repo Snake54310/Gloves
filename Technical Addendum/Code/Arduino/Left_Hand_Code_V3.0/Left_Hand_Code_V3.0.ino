@@ -79,6 +79,15 @@ int longFSMaxReading3 = 500;
 int longFSMinReading4 = 90;
 int longFSMaxReading4 = 500;
 
+//Failsafe mapping: if calibration range collapses, return 0 instead of breaking collection
+int safeMapToByte(int x, int in_min, int in_max) {
+  if (in_max == in_min) {
+    return 255;
+  }
+  int mapped = map(x, in_min, in_max, 0, 255);
+  return constrain(mapped, 0, 255);
+}
+
 void setup() {
 
   //Wait for serial and IMUs to boot
@@ -228,11 +237,11 @@ void sensorCalls() {
     longFSReading4 = analogRead(longFSPin4);
 
     //Map values from 0 to 255 flex
-    shortFSReading_adj = map(shortFSReading,shortFSMinReading,shortFSMaxReading,0,255);
-    longFSReading1_adj = map(longFSReading1,longFSMinReading1,longFSMaxReading1,0,255);
-    longFSReading2_adj = map(longFSReading2,longFSMinReading2,longFSMaxReading2,0,255);
-    longFSReading3_adj = map(longFSReading3,longFSMinReading3,longFSMaxReading3,0,255);
-    longFSReading4_adj = map(longFSReading4,longFSMinReading4,longFSMaxReading4,0,255);
+    shortFSReading_adj = safeMapToByte(shortFSReading, shortFSMinReading, shortFSMaxReading);
+    longFSReading1_adj = safeMapToByte(longFSReading1, longFSMinReading1, longFSMaxReading1);
+    longFSReading2_adj = safeMapToByte(longFSReading2, longFSMinReading2, longFSMaxReading2);
+    longFSReading3_adj = safeMapToByte(longFSReading3, longFSMinReading3, longFSMaxReading3);
+    longFSReading4_adj = safeMapToByte(longFSReading4, longFSMinReading4, longFSMaxReading4);
     
     //Constrain to 1 byte
     shortFSReading_adj = constrain(shortFSReading_adj,0,255);
@@ -283,7 +292,7 @@ void sensorCalls() {
       palmOutAcc = "E,E,E,";
     }
     if (IMU.gyroscopeAvailable()) {
-      IMU.readGyroscope(palmGyroX, palmGyroY, palmGyroZ);
+      IMU.readGyroscope(palmAccX, palmAccY, palmAccZ);
       palmOutGyro = String(palmGyroX) + "," + String(palmGyroY) + "," + String(palmGyroZ) + ",";
     } else {
       palmOutGyro = "E,E,E,";
