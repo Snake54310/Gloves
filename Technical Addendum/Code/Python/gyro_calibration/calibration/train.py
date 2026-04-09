@@ -6,6 +6,7 @@ from gyro_calibration.calibration.loss import (
     loss_trajectory_quadratic,
 )
 
+
 '''
 A_REF = np.array([
     [1.,  0.,  0.],
@@ -15,11 +16,10 @@ A_REF = np.array([
 '''
 # FOR FINGERS (-y):
 A_REF = np.array([
-    [1.,  0.,  0.],
+    [1., 0.,  0.],
     [0.,  1.,  0.],
     [0.,  0., 1.],
 ])
-
 
 def _run_minimize(loss_fn, params0, args, label):
     """Helper: run L-BFGS-B and report convergence."""

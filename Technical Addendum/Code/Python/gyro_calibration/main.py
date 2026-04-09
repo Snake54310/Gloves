@@ -39,9 +39,9 @@ N_FOLDS  = 8      # K-fold splits for trajectory CV
 '''
 
 # Fingers:
-LAMBDA_A = 1e-4 # 8e-5   # penalty on A deviating from identity
+LAMBDA_A = 1e-4 # 1e-4 # 8e-5   # penalty on A deviating from identity
 LAMBDA_B = 1e-5 # 1e-5 # 1e-5   # penalty on B (higher-order, more conservative)
-N_FOLDS  = 5      # K-fold splits for trajectory CV
+N_FOLDS  = 8      # K-fold splits for trajectory CV
 
 
 def load_and_clean_csv(path):
@@ -170,7 +170,7 @@ def main(pool):
     print(f"  Quadratic mean reduction: {quad_mean:.2%}  "
           f"(std: {quad_results['reductions'].std():.2%})")
 
-    use_quadratic = True # quad_mean > lin_mean * 1.02
+    use_quadratic = False # quad_mean > lin_mean * 1.02
 
     if use_quadratic:
         print("\n  → Quadratic gives >2% improvement. Use quadratic model.")

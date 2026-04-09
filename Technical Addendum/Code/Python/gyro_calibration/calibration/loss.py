@@ -3,7 +3,7 @@ from multiprocessing import Pool
 import os
 
 # FOR WRIST (-z):
-'''=
+'''
 A_REF = np.array([
     [1.,  0.,  0.],
     [0.,  1.,  0.],
