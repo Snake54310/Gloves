@@ -11,8 +11,8 @@ from GloveMonitorWindow import GloveMonitorWindow
 # ============================================================
 # Default COM port values — edit these to match your hardware
 # ============================================================
-DEFAULT_PORT_RIGHT = 'COM13'
-DEFAULT_PORT_LEFT  = 'COM8'
+DEFAULT_PORT_RIGHT = 'COM8'
+DEFAULT_PORT_LEFT  = 'COM13'
 
 baudRate = 2000000
 
