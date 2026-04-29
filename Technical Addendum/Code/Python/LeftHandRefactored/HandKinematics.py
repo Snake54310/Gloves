@@ -7,7 +7,7 @@ suitable for both the data display labels and the 3D renderer.
 
 Classes:
     Finger      — Represents one finger: joint flex angles + relative orientation.
-    RightHand   — Aggregate hand model; owns five Finger instances plus
+    LeftHand   — Aggregate hand model; owns five Finger instances plus
                   wrist-level orientation integration.
 
 Coordinate conventions:
@@ -44,7 +44,7 @@ class Finger:
         - J2 flex angle (degrees): the middle joint — between segment 1 and 2.
           Only meaningful for the four non-thumb fingers.
         - Orientation [X, Y, Z] in degrees, relative to the wrist frame.
-          Set by RightHand after computing wrist-relative Euler angles.
+          Set by LeftHand after computing wrist-relative Euler angles.
 
     Args:
         segment_lengths:    tuple of floats (inches), proximal → distal.
@@ -60,7 +60,7 @@ class Finger:
         self.j2_flex = 0.0   # middle joint angle in degrees; 0 and unused for thumb
 
         # Orientation of this finger relative to the wrist, in degrees [X, Y, Z].
-        # Updated by RightHand.update_orientation_fingers() each frame.
+        # Updated by LeftHand.update_orientation_fingers() each frame.
         self._orientation = [0.0, 0.0, 0.0]
 
     # --- Joint flex ---------------------------------------------------------
@@ -99,10 +99,10 @@ class Finger:
 
 
 # ---------------------------------------------------------------------------
-# RightHand
+# LeftHand
 # ---------------------------------------------------------------------------
 
-class RightHand:
+class LeftHand:
     """
     Full kinematic model of the right hand.
 

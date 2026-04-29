@@ -1,0 +1,60 @@
+File Name: SensorDataProcessor.py
+
+Necessary Packages: time, math, collections, csv, scipy
+
+Necessary Modules (files): None
+
+Overview: This file contains methods and classes associated with formatting incoming sensor data. It is accessed from
+GloveMonitorWindow.py. It performs operations such as filtering, unit conversions, and
+recordings (aside from GloveData.csv, this is created directly from SensorRead3.0).
+
+Methods: Not all methods are associated with a class. The classes are: LowPassFilter, SensorProcessor and GyroRecorder
+
+----------------------------------- LowPassFilter --------------------------------------------------------
+__init__ (LowPassFilter): Creates our basic low pass filter object with initial values and other parameters.
+
+update: pushes a value through our filter
+
+----------------------------------- Other (no class) --------------------------------------------------------
+Overview: At the same file heirarchy level as 'Technical Addendum', you fill find a folder called Flex_Sensor_Angles.
+This was created manually (by testing values at angles and computing 3rd-degree polynomial linear regression in
+MATLAB, thumb.m and pointer.m) by me to determine the true finger flex angles corresponding to the input flex sensor
+resistance values. These functions implement the conversion from the polynomial outputs of these MATLAB programs.
+
+finger_flex_to_angle: utilizes coefficients calculated for finger flex sensors to approximate joint angles
+
+thumb_flex_to_angle: utilizes coefficients calculated for thumb flex sensors to approximate joint angle
+
+
+----------------------------------- SensorProcessor --------------------------------------------------------
+__init__ (SensorProcessor): Initiates all sensor data lowpass filters and relevant environmental variables
+(i.e. sample rate)
+
+_init_filters: creates lowpass filters for all incoming sensor data
+
+update_sample_rate: estimates and updates current sample rate for filters to use
+
+process: filters all data (41 incoming signals) before passing it back to GloveMonitorWindow.py
+
+----------------------------------- GyroRecorder --------------------------------------------------------
+Overview: used to make recordings on pure gyroscope data. The files created may be used within the data folder of
+gyro_calibration as a means to attempt matrix training on gyroscope hardware error. Specifically, there are two ways
+to run this:
+
+1. leave lines 431-440 commented. In this case, record repeated sessions of starting hand at a zeroed,
+rested position, recording movement, and returning it to that position before stopping the recording.
+Hundreds of recordings performing various movements are usually required.
+
+2. Uncomment lines 431-440. This changes the file names the data is stored to by appending '_s' to the name before
+'.csv' . This is used to record sessions of negligible movement so that our gyro_calibration can directly estimate
+raw sensor drift.
+
+__init__ (GyroRecorder): Initializes basic variables associated with recording gyroscope sessions. These are used
+in the gyro_calibration, data folder (copy contents directly into associated files)
+
+start_episode: initiates recording. Called from GloveMonitorWindow.py
+
+stop_episode: terminates recording. Called from GloveMonitorWindow.py
+
+ record: writes current gyroscope angular velocity values to corresponding csv files, along with timestamps and
+ session counter (not used for any practical purpose, useful for visual comprehension of files)

@@ -426,18 +426,6 @@ class GyroRecorder:
         'ring':    'gyro_log_ring.csv',
         'pinky':   'gyro_log_pink.csv',
     }
-    # for gathering data on stationary gyroscopes (record raw drift for training), uncomment the following:
-    # (to resume regular data gathering of starting at and returning to zero-point, re-comment these lines)
-    '''
-    FILE_MAP = {
-        'wrist':   'gyro_log2_s.csv',
-        'thumb':   'gyro_log_thumb_s.csv',
-        'pointer': 'gyro_log_point_s.csv',
-        'middle':  'gyro_log_mid_s.csv',
-        'ring':    'gyro_log_ring_s.csv',
-        'pinky':   'gyro_log_pink_s.csv',
-    }
-    '''
     FIELDS = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
 
     def __init__(self):

@@ -1,0 +1,43 @@
+File Name: GloveMonitorWindow.py
+
+Necessary Packages: PySide6.QtWidgets, PySide6.QtCore
+
+Necessary Modules (files): SensorDataProcessor, HandKinematics, HandRenderer
+
+Overview: This file contains the code to manage the pyside monitor window. It is accessed from SensorRead3.0, and
+manages the operations in HandKinematics.py, SensorDataProcessor.py, and HandRenderer.py. It does not create any
+visual objects besides the monitor window (not the live animation window), which is primarily used for debugging and
+interfacing basic runtime operations by the user.
+
+Methods: All methods are kept under the GloveMonitorWindow class
+
+__init__: This initializes the basic monitor window and associated objects, such as the hand object, animation window and
+filters (low pass)
+
+_build_ui: appends all aspects of the basic monitor window ui to our QMainWindow object
+
+_build_menu, _build_labels, _build_buttons, _apply_layout: basic operations for building and structuring QMainWindow
+elements
+
+_centered_label, _change_view: control live display updates, such as selecting a different aspect (i.e. 'thumb') to
+view and updating live information (i.e. x_acceleration).
+
+initDisplay: makes display visible to user. Called from SensorRead3.0
+
+terminateDisplay: removes live display object. Called from SensorRead3.0
+
+updateData: Pipelines raw CSV data from glove to our GloveMonitorWindow interface. Called from SensorRead3.0
+Additionally, our data is put through our low_pass filtering to clean all signals.
+
+_update_kinematics: The information from updateData is sent to our rightHand (HandKinematics) object. Operations
+necessary to determine live hand orientation occur there.
+
+_update_animation: The data stored in our rightHand object is used to update the hand animationView (HandRenderer) object.
+
+_update_labels: This updates our displayed data in our basic monitor window.
+
+Usage Notes:
+- When zeroing the gyroscope sensors, lay your land flat on a surface and point all fingers (INCLUDING THUMB)
+straight forward, touching each other. Fingers and thumb should also be flat on the surface.
+- You can change the rate that the animation updates with the ANIMATION_SAMPLE_RATE_MULTIPLIER variable
+on line 64

@@ -1,0 +1,5 @@
+Information on all output files from the program:
+
+GloveData.csv: raw data pipelined directly from arduino board sensor readings. Columns are labeled. This file is
+functionally useless.
+

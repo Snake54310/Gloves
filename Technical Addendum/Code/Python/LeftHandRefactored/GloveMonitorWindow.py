@@ -13,8 +13,8 @@ the three supporting modules:
 
 Data flow each frame (triggered by SensorRead3_0 calling updateData()):
     1. SensorProcessor filters the raw 41-value data array.
-    2. RightHand updates joint angles from flex sensor readings.
-    3. RightHand integrates wrist + finger gyro into quaternions.
+    2. LeftHand updates joint angles from flex sensor readings.
+    3. LeftHand integrates wrist + finger gyro into quaternions.
     4. Qt labels are updated for whichever finger/view is currently selected.
     5. Every ANIMATION_SAMPLE_RATE_MULTIPLIER frames, the 3D renderer is updated.
 
@@ -38,7 +38,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QWidget, QGridL
 from PySide6.QtCore import Qt, QTimer
 
 from SensorDataProcessor import SensorProcessor, GyroRecorder, finger_flex_to_angle, thumb_flex_to_angle
-from HandKinematics import RightHand
+from HandKinematics import LeftHand
 from HandRenderer import AnimationWindow
 
 
@@ -66,7 +66,7 @@ class GloveMonitorWindow(QMainWindow):
 
     Owns:
         - A SensorProcessor for per-frame filtering.
-        - A RightHand for kinematics and orientation integration.
+        - A LeftHand for kinematics and orientation integration.
         - A GyroRecorder for optional research data logging.
         - An AnimationWindow (separate Qt3D window) for 3D visualisation.
         - A QTimer that pumps Qt events every 10 ms (necessary because
@@ -83,7 +83,7 @@ class GloveMonitorWindow(QMainWindow):
 
     # How many incoming data frames to skip between 3D renderer updates.
     # 2 = render every other frame, halving the rendering workload.
-    ANIMATION_SAMPLE_RATE_MULTIPLIER = 2
+    ANIMATION_SAMPLE_RATE_MULTIPLIER = 2 # THIS IS THE NUMBER YOU CHANGE IF YOUR COMPUTER IS LAGGING
 
     def __init__(self):
         super().__init__()
@@ -93,9 +93,9 @@ class GloveMonitorWindow(QMainWindow):
         # SensorProcessor owns all 41 filter instances and the sample rate estimator.
         self.processor = SensorProcessor(initial_sample_rate=100, cutoff_freq=5)
 
-        # RightHand owns the kinematic model: joint angles, quaternion integration,
+        # LeftHand owns the kinematic model: joint angles, quaternion integration,
         # and calibrated wrist gyro correction.
-        self.rightHand = RightHand()
+        self.rightHand = LeftHand()
 
         # GyroRecorder handles optional research CSV logging (can be removed with
         # its associated calls in _update_kinematics if no longer needed).
@@ -376,7 +376,7 @@ class GloveMonitorWindow(QMainWindow):
                75%/25% between J1 and J2 joints, reflecting the biomechanical
                tendency for the proximal joint to flex more than the middle joint.
             B. Gyro → orientation: wrist and finger gyro values are integrated
-               into running quaternions by RightHand.
+               into running quaternions by LeftHand.
 
         Filtered array index reference (matches SensorProcessor output layout):
             [0-4]   Flex (thumb through pinky)
@@ -417,7 +417,7 @@ class GloveMonitorWindow(QMainWindow):
             pinky_angle   * 0.25 if pinky_angle   else 0,
         )
 
-        # Pass the current sample rate so RightHand can scale gyro integration correctly.
+        # Pass the current sample rate so LeftHand can scale gyro integration correctly.
         self.rightHand.update_sample_rate(self.processor.estimated_sample_rate)
 
         # --- B. Gyro → orientation integration ---
@@ -494,7 +494,7 @@ class GloveMonitorWindow(QMainWindow):
         FINGER_OFFSETS table, then formats and sets each label's text.
 
         For the Wrist view, displays wrist acc/gyro raw values plus the
-        integrated orientation from RightHand.get_orientation().
+        integrated orientation from LeftHand.get_orientation().
 
         Args:
             d:         filtered data array (same layout as SensorProcessor output).

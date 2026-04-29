@@ -83,7 +83,7 @@ class GloveMonitorWindow(QMainWindow):
 
     # How many incoming data frames to skip between 3D renderer updates.
     # 2 = render every other frame, halving the rendering workload.
-    ANIMATION_SAMPLE_RATE_MULTIPLIER = 2
+    ANIMATION_SAMPLE_RATE_MULTIPLIER = 2 # THIS IS THE NUMBER YOU CHANGE IF YOUR COMPUTER IS LAGGING
 
     def __init__(self):
         super().__init__()

@@ -1,0 +1,74 @@
+File Name: HandKinematics.py
+
+Necessary Packages: numpy, scipy
+
+Necessary Modules (files): None
+
+Overview: This file interprets our filtered sensor data and stores the live details of the hand's current position. All
+data sent to and received from this file must pass through GloveMonitorWindow.py. This data is used both for animation
+and hand-position identification.
+
+Methods: All methods are kept under the RightHand and Finger classes
+
+----------------------------------- Finger Methods --------------------------------------------------------
+__init__ (Finger): Called from within the RightHand class to generate finger objects. finger may be used to store and
+access segment joint angles and segment lengths, as well as the finger's relative orientation to the wrist.
+
+set_j1_flex: sets the flex measured on the middle finger joint
+
+set_j2_flex: sets the flex measured on the front-most finger joint
+
+get_j1_flex: gets the flex measured on the middle finger joint
+
+get_j2_flex: gets the flex measured on the front-most finger joint
+
+zero_orientation, set_orientation: POTENTIALLY USED to set finger relative orientation. Due to our quaternion implementation, this function
+is not utilized.
+
+get_orientation: POTENTIALLY USED to get finger relative orientation. Due to our quaternion implementation, this function
+is not utilized.
+
+------------------------------------ RightHand Methods ----------------------------------------------
+__init__ (RightHand): sets thumb and finger segment lengths to be stored. This is unrelated to those stored in our
+animation window. Additionally, creates thumb and finger objects for the hand. Initializes a dummy value for the
+sampling rate which is dynamically updated later (In other words, the initial value is not significant). Creates variables
+to store euler (presently unused) and quaternion values related to wrist gyro, then fingers gyro. Finally, initializes
+correction matrices for gyro sensors (see gyro_calibration folder). These values are meant to correct the predictable
+hardware-born errors due to our sensors and their actual installation.
+
+update_sample_rate: sets new sample rate based on dynamically calculated value
+
+set_j1_angles: sets angles of middle finger joints (across all 4 fingers and thumb) to be stored in our
+created finger objects
+
+set_j2_angles: sets angles of end finger joints (across all 4 fingers, NOT thumb) to be stored in our
+created finger objects
+
+get_j1_angles, get_j2_angles: retrieves joint angles from fingers and pushes them forward as our returned value
+
+update_orientation: Calculates and updates angle of wrist gyroscope sensor based on our transformation matrices
+(use as model for finger gyroscope transformations, THOUGH: THESE ARE BETTER DONE LINEARLY (without matrix B)).
+Additionally, these values are stored as a usable 4-length vector (x, y, z, w)
+
+update_orientation_fingers: similar to wrist, updates relative orientation on all fingers. Additional transformation of
+backwards-calculating from finger tips to wrist utilizing other joint angles (again, not presently used (instead,
+calculated later) as this required unreliable Euler angles)
+
+zero_orientation: Zeros all stored data associated with glove live position
+
+get_orientation: returns stored wrist gyroscope euler angle values (unused)
+
+get_orientation_q: returns stored wrist gyroscope quaternion values (used)
+
+get_relative_orientations: returns stored finger gyroscope euler angle values (unused)
+
+get_relative_orientations_q: returns stored finger gyroscope quaternion angle values (used)
+
+relative_q: computes relative quaternion angle of one finger compared to the wrist and returns it
+(Utilized internally within get_relative_orientations_q).
+
+get_j0_angles: returns angles for base segments for fingers (Unused, only relevant for Euler implementation)
+
+j0_x: returns base joint angle of a finger based on euler implementation (internal to get_j0_angles, never accessed)
+
+

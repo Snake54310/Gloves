@@ -1,0 +1,86 @@
+File Name: HandRenderer.py
+
+Necessary Packages: PySide6.Qt3DCore, PySide6.Qt3DExtras, PySide6.Qt3DRender, PySide6.QtGui
+
+Necessary Modules (files): None
+
+Overview: This file manages our live animation and our live animation window. It is accessed from GloveMonitorWindow.py.
+It both creates the animation window and performs all updates on our animated object.
+
+Methods: All methods are kept under the AnimationWindow class
+
+__init__: creates all necessary components of our visual window. Our camera faces the +y direction relative to animated
+events, with the back of the hand near the origin and the tips of the fingers pointed along the y-axis
+
+_setup_camera: sets up the camera. This includes setting the window size ratio (16x9), camera position inside of the
+window, the direction the camera points, the 'up' direction (positive z-axis), and settings for zooming and moving the
+view inside the frame.
+
+_setup_material: sets material color and determines how light interacts with our material
+
+_setup_lighting: determines light source position and brightness. 2 total sources (above and below hand), with
+the top light source being twice as bright as the lower one.
+
+_add_point_light: determines color of light. Light is created relative to hand object.
+
+_build_scene: calls methods to build components of hand to be animated (i.e. fingers)
+
+_make_segment_entity: generates a single finger segment of a specified length, at a specified distance and angle
+relative to a specified parent element
+
+_build_palm: Creates our palm/wrist/back-of-hand (all same thing) object. This is the root object that operates a
+reference point for position and behavior of all other objects within the animation frame.
+
+_build_three_segment_finger: calls _make_segment_entity three times (once for each segment) to create a
+3-segment finger object. parent object will always be our palm, but may be otherwise specified.
+
+_build_four_fingers: builds four fingers off our palm parent entity. Exact sizing of finger segments may be edited here,
+though I believe my selected proportions are reasonable.
+
+_build_thumb: builds a thumb object onto our palm parent entity. It contains 2 segments and offset to the
+right side of the palm.
+
+_apply_flex: applies data from our flex sensor position (stored in HandKinematics) to the live animation view.
+Essentially just rotates middle (center) segment relative to proximal (nearest to palm) segment, then rotates
+distal (end) segment relative to middle segment.
+
+setAnglesPointer, setAnglesMiddle, setAnglesRing, setAnglesPinky, setAngleThumb: From _apply_flex, sets (relative)
+angles of middle and distal segments (just distal for thumb)
+
+setOrientationPalm: Sets the palm rotation based on gyroscope sensor live position
+(calculated and stored in HandKinematics.py). Before making changes, ensure basic understanding of quaternions.
+
+BASIC IDEA: our gyroscope sensors do not track live position. Instead, they track angular velocity in relative
+x, y, and z axes. This means that if our desire is to interpret angular position, we must create some summation of
+these angular velocities (integral of speed) relative to our sampling frequency.
+
+HOWEVER, whenever we rotate the sensors, the angle from which we are adjusting our angular position changes.
+As a basic experiment, follow these steps imagining a sensor on the palm of your hand tracking relative angulation:
+NOTE: you do NOT need to wear the glove for this experiment.
+1. place your hand flat on the table. lift it up slightly
+2. note that FROM THIS FLAT SET POINT, rotating your hand forward or backward results in sensor data in the +-y direction,
+tilting your hand side-to-side results in sensor data in the +-x direction, and pivoting your hand (move from elbow) so
+that your fingers point to the right or left (or backwards if you turn around 180 degrees) results in movement in the
++-z direction.
+3. Now, consider a feature of properly tracking finger movement: if you start your hand in a position and stop your
+hand in that same physical position, the total summation of your angles must be 0. You should get a result that
+is 0 degrees x, 0 degrees y, and 0 degrees z.
+4. Let's perform an experiment: start by placing your hand flat on a table, and then lift it up a bit.
+5. rotate your wrist so your fingers point straight down. The sensors (correctly) track this movement as +90 degrees
+around the y-axis.
+6. Now, leaving your wrist static (preserve the 'L' shape), rotate your arm such that your fingers point to the left.
+The sensors track this movement as + 90 degrees around the z-axis
+7. Leaving your arm in the same position, point your wrist (and fingers) straight forward again. This is tracked as
+-90 degrees around the y-axis.
+8. Rotate your arm such that your hand is flat again. Go ahead and set it down on the table before. The sensor would
+track this as -90 degrees around the x-axis.
+9. Now, let's sum our total angle: +90Y + 90Z - 90Y - 90X = +90Z - 90X
+What happened?! Our angle should have summed to 0, but now we have massive angle components in the x and z directions.
+10. This is because our relative axis changes at the end of every rotation. In this program, we utilize quaternions to
+simulate tracking our live axis and updating our angles accordingly.
+
+This is not an explanation of how quaternions work, but is instead an example for a baseline intuition as to why they
+are needed for this program. DO NOT ATTEMPT TO IMPLEMENT MATHEMATICS BASED ON EULER ANGLES. FOR THE LOVE OF ALL THAT
+IS GOOD AND RIGHT (I phrase it this way because I am religious).
+
+setOrientationFingers: Sets proximal segments relative to palm segments using Quaternion angle calculations
