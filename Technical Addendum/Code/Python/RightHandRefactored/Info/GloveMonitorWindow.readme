@@ -36,8 +36,15 @@ _update_animation: The data stored in our rightHand object is used to update the
 
 _update_labels: This updates our displayed data in our basic monitor window.
 
+_zero_gyros: zeros gyroscope values
+
+_record_snapshot: capture a labeled snapshot to be stored in PositionData_Snapshots
+
+_guess_pose: utilize your random trees classifier to determine the most likely current hand position
+
 Usage Notes:
 - When zeroing the gyroscope sensors, lay your land flat on a surface and point all fingers (INCLUDING THUMB)
 straight forward, touching each other. Fingers and thumb should also be flat on the surface.
 - You can change the rate that the animation updates with the ANIMATION_SAMPLE_RATE_MULTIPLIER variable
 on line 64
+- To utilize position identification, ensure your random trees classifier exists in the models folder

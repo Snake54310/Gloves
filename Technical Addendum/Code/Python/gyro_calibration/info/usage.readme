@@ -1,0 +1,42 @@
+Required Packages: numpy, scipy, pandas, sklearn, multiprocessing, os
+
+Hardware Requirements: Allowed CPU Usage up to 8 threads (one for each fold in k-folds), some amount of memory that
+could be described as 'enough'
+
+General Overview: Requires 2 types of files ~ (1) * gyro_return_to_0.csv (copy contents to /data/raw/gyro_log.csv)
+ (2) * gyro_stationary.csv (copy contents to /data/raw/gyro_stationary.csv)
+
+ (1): a series of gyroscope recordings (one gyroscope) measuring the rad/s in x, y, and z directions. This file
+ has a series of 'start' and 'end' flags that represent the gyroscope starting at and returning to a zeroed position
+ following the quaternion summation of wx, wy, and wz
+
+ (2): a series of gyroscope recordings (one gyroscope) measuring the rad/s in x, y, and z directions. This file
+tracks an unmoving gyroscope to average base sensor drift.
+
+Additionally, we will store our transformation matrices in /data/raw/recent_transformation_matrices.txt. I recommend
+only tracking the linear matrix formulations and avoiding the quadratics (to do this, find the 'use_quadratic' (line ~175)
+variable
+assignment in main.py and ensure it is False). An implementation of these matrices can be seen in
+Python/RightHandRefactored/HandKinematics.py.
+
+Further details:
+- If your velocity matrix A multipliers are going towards 0 (anything below .95 on the diagonal should be taken
+as extremely suspicious), increase LAMBDA_A (and maybe LAMBDA_B) in main.py. This penalizes drift from our initial
+transformation. Both of these parameters are found in main.py (line ~45)
+
+- For fingers, we want to target the matrix I 3x3 (identity matrix, 3x3). However, our gyroscope sensors were *somehow*
+mounted upside-down.. so we will target:
+[1  0  0]
+[0  1  0]
+[0  0 -1]
+To check this, look at A_REF assignment at the top of loss.py and train.py (this shows up in each file. The A_REF
+parameter should agree (be consistent) throughout the program.
+
+- I will not be writing readme files for each individual python file. Essentially, we use k-folds to train
+values on 2-3 matrices (linear or quadratic) on our gyroscope error. This is so we can reduce the frequency we must
+zero our gyroscopes. I do not recommend attempting additional tuning on this iteration of the glove design: I have
+verified that this code works (probably, or at the very least developed a good template), and if the
+project progresses to the point where general usability becomes a priority this is already set up. Please call me
+(608) 780-9278 or email me h65w675@student.montana.edu with any questions (my name is Erik Moore).
+
+

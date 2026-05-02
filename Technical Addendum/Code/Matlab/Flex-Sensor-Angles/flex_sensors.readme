@@ -1,0 +1,13 @@
+Basic idea: zero sensors as aggressivly as possible. Then, point finger (or sensor) straight. Read that value.
+Write the value and the angle in a csv file (do not 'overwrite flex sensor angles.xlsx', this is a useful example). 
+Going down 5 or fewer degrees (angle) at a time, record the angles and corresponding actual values. Do this until you get
+to a realistic stopping point (maybe 170 degrees). 
+
+The provided matlab files are templates for determining your flex sensor coefficients (the flex sensors are not linear 
+with angle, so we approximate by a 3rd order polymonial). I recommend using my files as demonstrations for what you need to do.
+
+This polynomial is then moved into '/Technical Addendum/Code/Python/SensorDataProcessor.py,' into all SensorDataProcessor.py files (found in DualHands, RighthandRefactored, LeftHandRefactored), inside of either the finger_flex_to_angle() or finger_flex_to_angle() function's return value(s)
+(i.e.         return 0.00001595 * flex**3 - 0.003083 * flex**2 + 0.4174 * flex + 0.8620)
+
+
+

@@ -8,13 +8,14 @@ from gyro_calibration.calibration.loss import (
 
 
 '''
+# FOR Wrist (-z):
 A_REF = np.array([
     [1.,  0.,  0.],
     [0.,  1.,  0.],
     [0.,  0., -1.],
 ])
 '''
-# FOR FINGERS (-y):
+# FOR FINGERS:
 A_REF = np.array([
     [1., 0.,  0.],
     [0.,  1.,  0.],

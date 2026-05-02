@@ -8,7 +8,8 @@ Overview: This file contains methods and classes associated with formatting inco
 GloveMonitorWindow.py. It performs operations such as filtering, unit conversions, and
 recordings (aside from GloveData.csv, this is created directly from SensorRead3.0).
 
-Methods: Not all methods are associated with a class. The classes are: LowPassFilter, SensorProcessor and GyroRecorder
+Methods: Not all methods are associated with a class. The classes are: LowPassFilter, SensorProcessor, GyroRecorder, and
+PositionRecorder
 
 ----------------------------------- LowPassFilter --------------------------------------------------------
 __init__ (LowPassFilter): Creates our basic low pass filter object with initial values and other parameters.
@@ -16,7 +17,7 @@ __init__ (LowPassFilter): Creates our basic low pass filter object with initial 
 update: pushes a value through our filter
 
 ----------------------------------- Other (no class) --------------------------------------------------------
-Overview: At the same file heirarchy level as 'Technical Addendum', you fill find a folder called Flex_Sensor_Angles.
+Overview: Inside of '\Technical Addendum\Code\Matlab\', you fill find a folder called Flex_Sensor_Angles.
 This was created manually (by testing values at angles and computing 3rd-degree polynomial linear regression in
 MATLAB, thumb.m and pointer.m) by me to determine the true finger flex angles corresponding to the input flex sensor
 resistance values. These functions implement the conversion from the polynomial outputs of these MATLAB programs.
@@ -56,5 +57,26 @@ start_episode: initiates recording. Called from GloveMonitorWindow.py
 
 stop_episode: terminates recording. Called from GloveMonitorWindow.py
 
- record: writes current gyroscope angular velocity values to corresponding csv files, along with timestamps and
+record: writes current gyroscope angular velocity values to corresponding csv files, along with timestamps and
  session counter (not used for any practical purpose, useful for visual comprehension of files)
+
+----------------------------------- PositionRecorder --------------------------------------------------------
+Overview: Used to record continuous live position data or labeled snapshots
+
+__init__ (PositionRecorder): Ensures current state is not recording anything, assigns file names for data to be written
+to
+
+_build_position_row: builds row of entire position data, including real-time timestamp, runtime timestamp,
+all gyroscope quaternion information, all flex sensor data (per-joint)
+
+_append_row: If we are recording a snapshot, appends a label to _build_position_row. This can be thumbs up,
+thumbs down, point, peace, or no_position
+
+start_continuous: initiates continuous recording
+
+stop_continuous: terminates continuous recording
+
+record_continuous: during continuous recording, stores a row of position data (see _build_position_row)
+
+record_snapshot: records a snapshot row of position data (see _build_position_row and _append_row)
+

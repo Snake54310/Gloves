@@ -194,6 +194,16 @@ class GyroRecorder:
         'ring':    'gyro_log_ring.csv',
         'pinky':   'gyro_log_pink.csv',
     }
+    '''
+    FILE_MAP = {
+        'wrist':   'gyro_log2_s.csv',
+        'thumb':   'gyro_log_thumb_s.csv',
+        'pointer': 'gyro_log_point_s.csv',
+        'middle':  'gyro_log_mid_S.csv',
+        'ring':    'gyro_log_ring_s.csv',
+        'pinky':   'gyro_log_pink_S.csv',
+    } 
+    '''
     FIELDS = ['episode_id', 'timestamp', 'wx', 'wy', 'wz', 'marker']
 
     def __init__(self):

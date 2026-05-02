@@ -3,3 +3,26 @@ Information on all output files from the program:
 GloveData.csv: raw data pipelined directly from arduino board sensor readings. Columns are labeled. This file is
 functionally useless.
 
+PositionData_Continuous.csv: From inside the program, you may decide to record live position data. In that case,
+it is stored in this file. There are 35 total columns: real-time timestamp, runtime timestamp, all quanterion positions
+at that time, all flex sensor data at that time
+
+PositionData_Snapshots.csv: From inside the program, you may decide to take snapshots of live position data.
+In that case, it is stored in this file. There are 36 total columns: real-time timestamp, runtime timestamp, all
+quanterion positions at that time, all flex sensor data at that time, and the flag of the position you selected. If you
+click 'Snapshots under the second dropdown menu,' you are presented with 5 position options. To write a sample to a file,
+simply orient your hand in the corresponding position and click the position you are in (i.e. thumbs down).
+To re-train your basic position identification model, move this file to position_Identification and run
+train_hand_pose_model.py.
+
+(Note, V is a placeholder for mid, pink, point, ring, thumb, or 2) (2 is the wrist gyroscope)
+Gyro_log_V.csv: These are created when you attempt to collect data on your gyro sensor error. To do this,
+ move your glove to a zero position, click 'record gyro', then move your hand around a bit. Finally, return your hand
+ to your starting position and click 'stop gyro recording.' This creates a sample error for the gyroscope given
+ some tracked gyroscope data. This file is used in Python\gyro_calibration, and the contents are copied to data/raw/gryo_log.csv
+ (within the Python\gyro_calibration directory). Note that you will want to copy Gyro_log_V_s.csv into data/raw/gryo_stationary.csv
+ at the same time. Further implementation details can be found in Python\gyro_calibration\info
+
+Gyro_log_V_s.csv: Created alongside Gyro_log_V.csv. You will have to uncomment the secondary 'FILE_MAP' variable assignment
+inside of SensorDataProcessor.py, GyroRecorder class to create these files. The intent is that you will keep your hand
+motionless for these recordings to capture raw sensor drift.

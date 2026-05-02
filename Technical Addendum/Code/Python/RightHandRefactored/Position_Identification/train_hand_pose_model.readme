@@ -1,0 +1,5 @@
+Required Packages: pandas, sklearn, joblib, os
+
+Basic idea: using the PositionData_Snapshots.csv file, train a simple random forests most trees model to identify
+explicitly-named hand positions. Created model called hand_pose_random_forest_model.pkl gets moved (copied) to
+/RightHandRefactored/models to be utilized in the main program.
